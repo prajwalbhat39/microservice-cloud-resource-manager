@@ -30,8 +30,8 @@ requires: Quota must not merely comply, it must be the example U2, U3 and U4 cop
 | NFR-5 | REST over HTTP only; no shared code library | **Binds** | Four peer clients; `common` package copied, not shared |
 | NFR-6 | Root aggregator pom with no shared code | **Partially binds** | U1 contributes two modules; the root pom is a solution-level artefact |
 | NFR-7 | Business endpoints versioned under `/api/v1/` | **Binds** | All 11 business endpoints of U1 |
-| NFR-8 | All input validated; 400 names the offending fields | **Binds** | Five request-bearing endpoints |
-| NFR-9 | Precise status codes | **Binds** | U1 uses 200/201/202/400/404/409/422/503 |
+| NFR-8 | All input validated; 400 names the offending fields | **Binds** | Four request-bearing endpoints (Q1, Q4, R1, R4) plus path variables |
+| NFR-9 | Precise status codes | **Binds** | U1's business outcomes are 200/201/202/400/404/409/422/503, plus 405 and a last-resort 500 |
 | NFR-10 | One error format everywhere: RFC 9457 + `code`, `correlationId`, `timestamp` | **Binds** (reference impl.) | Quota's handler is the template for all four units |
 | NFR-11 | springdoc OpenAPI, `openapi.yaml` committed | **Binds** | Two specs to commit |
 | NFR-12 | `GET /health` reporting status and DB connectivity | **Binds** | Both services have a datasource |
@@ -83,10 +83,10 @@ U1's obligation is to be buildable from it and to put nothing shareable in it.
 | NFR | Obligation on both services | Verified by |
 |-----|----------------------------|-------------|
 | NFR-7 **binds** | Every business path begins `/api/v1/`: Quota's 5 paths and the Orchestrator's 6 paths listed in `functional-design.md` §3 and §4. `/health` and `/v3/api-docs.yaml` are operability endpoints and stay outside the prefix — stated explicitly so the deviation is a decision, not an oversight | Controller-level `@RequestMapping` review; the committed `openapi.yaml` lists every path |
-| NFR-8 **binds** | Bean Validation on all five request-bearing endpoints (Q1, Q4, R1 and the query parameters of R4, plus path variables). A violation returns **400** with the offending field names in the problem body's `errors` array. Validation is syntactic only: `cpu <= 256` is validation, `cpu` fitting the tenant's quota is BR1 | Unit tests per DTO: `CreateTenantRequestValidationTest`, `ReserveQuotaRequestValidationTest`, `ProvisionResourceRequestValidationTest`, each asserting the field name appears in the response |
-| NFR-9 **binds** | The code set U1 may return is exactly: 200 (reads, reserve, release), 201 (tenant created), 202 (provision accepted, termination accepted), 400 (malformed/missing key), 404 (absent tenant/resource/reservation), 409 (state conflict: `INVALID_STATE_TRANSITION`, `TENANT_ALREADY_EXISTS`, `QUOTA_RESERVATION_ALREADY_RELEASED`), 422 (business-rule violations), 503 (downstream unavailable). No 200-with-error-in-body, and no 500 on a foreseeable condition | `openapi.yaml` review plus one controller test per status code; the three challenge scripts assert codes numerically |
+| NFR-8 **binds** | Bean Validation on all **four** request-bearing endpoints — Q1 and Q4 (request bodies), R1 (body plus the `Idempotency-Key` header), R4 (query parameters) — plus the path variables of Q2, Q3, Q5, R2, R3 and R5. A violation returns **400** with the offending field names in the problem body's `errors` array. Validation is syntactic only: `cpu <= 256` is validation, `cpu` fitting the tenant's quota is BR1 | Unit tests per DTO: `CreateTenantRequestValidationTest`, `ReserveQuotaRequestValidationTest`, `ProvisionResourceRequestValidationTest`, each asserting the field name appears in the response |
+| NFR-9 **binds** | The **business** outcomes U1 returns are exactly: 200 (reads, reserve, release), 201 (tenant created), 202 (provision accepted, termination accepted), 400 (malformed/missing key), 404 (absent tenant/resource/reservation), 409 (state conflict: `INVALID_STATE_TRANSITION`, `TENANT_ALREADY_EXISTS`, `QUOTA_RESERVATION_ALREADY_RELEASED`), 422 (business-rule violations), 503 (downstream unavailable). Two further codes exist and are **not** business outcomes: **405** `METHOD_NOT_ALLOWED` for a wrong method on an existing path, and **500** `INTERNAL_ERROR` from the last-resort handler, which by definition covers only the unforeseen (`nfr-design.md` §2.1, §2.2). The obligation is therefore: no 200-with-error-in-body, and no 500 on any *foreseeable* condition — a 500 in a test run or a demo is a defect to be fixed, not a documented outcome | `openapi.yaml` review plus one controller test per status code; the three challenge scripts assert codes numerically; the 405 and 500 handlers are covered by `ErrorResponseContractTest` |
 | NFR-10 **binds (reference impl.)** | One `@RestControllerAdvice` per service producing RFC 9457 Problem Details extended with `code`, `correlationId`, `timestamp`. **Every** error response, including framework-generated ones (unreadable JSON, missing header, wrong method, unmapped path), goes through it. The shared `code` vocabulary is published for U2–U4 | `ErrorResponseContractTest` asserts the five mandatory members on a sample of each error class; the vocabulary table in `nfr-design.md` §2.2 is the single source |
-| NFR-11 **binds** | springdoc on both services; `openapi.yaml` exported and committed per service, regenerated whenever a controller changes. Annotations must carry the error codes each operation can emit, so the spec matches `functional-design.md` | Diff check: the committed spec matches a freshly generated one. **Needs the toolchain** → Build and Test |
+| NFR-11 **binds** | springdoc on both services; `openapi.yaml` exported to `services/<service>/openapi.yaml` and committed, regenerated whenever a controller changes. `@ApiResponse` annotations carry the error codes each operation can emit, so the spec matches `functional-design.md`. The springdoc properties, the export command and the determinism settings that make the diff meaningful are designed in `nfr-design.md` §5.5 | Diff check: the committed spec matches a freshly generated one. **Needs the toolchain** → Build and Test |
 
 ---
 
@@ -113,7 +113,7 @@ U1's obligation is to be buildable from it and to put nothing shareable in it.
 | NFR-21 **binds** | All state in `quota_db`. No cache of tenants or usage; no in-memory counter of any kind — a counter would be a second copy of the contended resource | All state in `resource_db`. The one in-memory structure is the `sagaExecutor` queue of pending tasks; losing it on restart loses in-flight provisionings, which is recorded as a known limitation (`functional-design.md` §13 A6), not papered over | Code review for `static` mutable state and for caches; restart test: stop and start a service and confirm every endpoint still answers from the database |
 | NFR-22 **binds** | All timestamp columns `timestamptz`, all Java instants `java.time.Instant`, `UTC` session time zone, ISO-8601 `Z` in JSON. Quota holds no money | Same, plus `ratePerCpuHour` is a `BigDecimal` (scale 4) parsed from configuration and serialised as a JSON string. No `double` or `float` anywhere in U1 | `TimestampSerialisationTest`; code review for `double`/`float`; migration review for `timestamptz` |
 | NFR-23 **binds** | Schema created only by Flyway `V1__baseline.sql`; `spring.jpa.hibernate.ddl-auto: validate` so a drifted entity fails fast instead of silently altering the schema | Same, with its own `V1__baseline.sql` | Startup fails if an entity does not match the migration — that failure *is* the test. Migration files reviewed in `infrastructure-design.md` §2 and §3 |
-| NFR-24 **binds (security baseline)** | Every dependency and plugin version pinned, inherited from the Spring Boot BOM or stated explicitly. No `LATEST`, no `RELEASE`, no open range, no snapshot | Same | `pom.xml` review; `./mvnw dependency:tree` captured once as evidence. **Needs the toolchain** → Build and Test |
+| NFR-24 **binds (security baseline)** | Every dependency **and plugin** version pinned, inherited from an explicitly versioned Spring Boot parent or stated in `<properties>`. No `LATEST`, no `RELEASE`, no open range, no snapshot. The pinning rules and what is exempt are designed in `nfr-design.md` §5.6 | Same | `pom.xml` review; `./mvnw dependency:tree` captured into `evidence/infra/dependency-tree.txt`. **Needs the toolchain** → Build and Test |
 
 ---
 
@@ -152,6 +152,14 @@ so that stage picks them up as a checklist rather than rediscovering them.
 
 Everything else in sections 2–6 is verifiable by unit test or code review at Code Generation
 time.
+
+Two of these rows are **verification** deferrals only, not design gaps: NFR-11's springdoc
+configuration, export path and annotation convention are fixed in `nfr-design.md` §5.5, and
+NFR-24's pinning rules in §5.6. What waits for the toolchain is running the export and the
+dependency tree, because both need a JVM. The distinction matters because `workflow-plan.md` §1
+scopes NFR Design to "validation, error model, correlation ID, logging, config, migrations", so
+without saying this explicitly a reader could reasonably assume both obligations had simply been
+left to Code Generation to invent.
 
 ---
 

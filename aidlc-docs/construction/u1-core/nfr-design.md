@@ -177,7 +177,7 @@ This table is the single source of truth for the whole system and is republished
 | `VALIDATION_FAILED` | 400 | One or more request fields violated a syntactic constraint; `errors[]` names them | all services |
 | `MALFORMED_REQUEST` | 400 | Body was not valid JSON or could not be bound at all | all services |
 | `IDEMPOTENCY_KEY_REQUIRED` | 400 | `Idempotency-Key` header absent or blank on `POST /api/v1/resources` (FR-12) | Orchestrator |
-| `TENANT_NOT_FOUND` | 404 | No tenant with that id | Quota; **propagated unchanged** by Orchestrator |
+| `TENANT_NOT_FOUND` | 404 | No tenant with that id | Quota; **propagated** by Orchestrator per §2.4 |
 | `RESOURCE_NOT_FOUND` | 404 | No resource with that id | Orchestrator |
 | `RESERVATION_NOT_FOUND` | 404 | No request-level reservation with that id | Orchestrator |
 | `QUOTA_RESERVATION_NOT_FOUND` | 404 | No ledger row for that `resourceId` | Quota |
@@ -186,8 +186,8 @@ This table is the single source of truth for the whole system and is republished
 | `TENANT_ALREADY_EXISTS` | 409 | A client-supplied `tenantId` is already taken | Quota |
 | `INVALID_STATE_TRANSITION` | 409 | The requested lifecycle transition is not on the graph; body carries `currentStatus` (BR4, FR-22) | Orchestrator |
 | `QUOTA_RESERVATION_ALREADY_RELEASED` | 409 | A reserve was attempted for a `resourceId` whose ledger row is already `RELEASED` | Quota |
-| `QUOTA_EXCEEDED` | 422 | The atomic conditional update matched no row; body carries `exhausted[]` (BR1, AC-1.3) | Quota; **propagated** by Orchestrator |
-| `TIER_FORBIDS_RESOURCE_TYPE` | 422 | FREE tier may not provision CLUSTER (BR8) | Quota; **propagated** by Orchestrator |
+| `QUOTA_EXCEEDED` | 422 | The atomic conditional update matched no row; body carries `exhausted[]` (BR1, AC-1.3) | Quota; **propagated** by Orchestrator **including `exhausted[]`** (§2.4) |
+| `TIER_FORBIDS_RESOURCE_TYPE` | 422 | FREE tier may not provision CLUSTER (BR8) | Quota; **propagated** by Orchestrator per §2.4 |
 | `INVALID_TIER` | 422 | Tier string is not FREE/STANDARD/ENTERPRISE | Quota |
 | `IDEMPOTENCY_PAYLOAD_MISMATCH` | 422 | Key reused with a different request fingerprint (BR3) | Orchestrator |
 | `DOWNSTREAM_UNAVAILABLE` | 503 | A synchronous peer call failed after retries; the peer is named in `detail`, never in the code | Orchestrator, Usage aggregator (U4) |
@@ -244,9 +244,46 @@ without the orchestrator leaking peer URLs or stack traces.
 **Alternatives considered and rejected.** A custom `{ "error": ..., "message": ... }` envelope
 was rejected: RFC 9457 is a standard with a registered media type, and NFR-10 names it. Mapping
 peer errors straight through (returning Quota's raw body from the orchestrator) was rejected
-except for the two cases where the business answer genuinely belongs to Quota
-(`QUOTA_EXCEEDED`, `TIER_FORBIDS_RESOURCE_TYPE`, plus `TENANT_NOT_FOUND`); everything else is
-translated so the orchestrator's `instance` and `correlationId` stay its own.
+except for the three cases where the business answer genuinely belongs to Quota
+(`QUOTA_EXCEEDED`, `TIER_FORBIDS_RESOURCE_TYPE`, `TENANT_NOT_FOUND`); everything else is
+translated so the orchestrator's `instance` and `correlationId` stay its own. What exactly
+survives that propagation is specified in §2.4, because an acceptance criterion depends on it.
+
+### 2.4 Propagating a peer's business rejection
+
+Three codes are marked "propagated" in §2.2. Propagation here is **not** a pass-through of
+Quota's bytes, and it is not a bare status-and-code translation either. The rule:
+
+> A propagated business rejection keeps its `code`, its `title`, its `detail` and **all of its
+> RFC 9457 extension members**. Only `instance` and `correlationId` are rewritten — `instance`
+> to the orchestrator's own request URI, `correlationId` to the orchestrator's MDC value (which
+> is the same ID Quota saw, because §3.2 forwarded it). `timestamp` is re-stamped at the moment
+> the orchestrator renders the body.
+
+| Member | On propagation | Why |
+|--------|---------------|-----|
+| `code`, `status` | unchanged | The business answer is Quota's; re-coding it would hide which rule rejected the request |
+| `title`, `detail` | unchanged | `detail` already names the tenant and the shortfall |
+| `exhausted[]` (on `QUOTA_EXCEEDED`) | **carried through unchanged** | AC-1.3 requires every rejected request to identify which limit was exhausted, and the Challenge 1 script reads it from the **orchestrator's** 422, not from Quota's (`infrastructure-design.md` §7.3). Dropping it on propagation would silently fail that criterion |
+| any future extension on a propagated code | carried through | The rule is "keep extensions", not "keep a named list", so a new member on Quota's side does not need an orchestrator change |
+| `instance` | rewritten to the orchestrator's URI (`/api/v1/resources`) | A client that called the orchestrator must not be told the failure happened at a path it never called |
+| `correlationId` | rewritten from the orchestrator's MDC | Same value in practice; taken locally so a peer that failed to echo the header cannot blank the field |
+| `timestamp` | re-stamped | It describes the response being written |
+
+Mechanically: `QuotaClient` deserialises a 4xx problem body into a `PeerProblem` record
+(status, code, title, detail, plus a `Map<String, Object>` of unknown members), and throws
+`BusinessRejection`, which `GlobalExceptionHandler` renders through the same
+`ProblemDetailsFactory.problem(...)` call as everything else, passing the captured extension map
+straight into the `extensions` argument. So there is still exactly one place a problem body is
+built, and still no raw peer body on the wire.
+
+Everything that is **not** a business rejection — a 503, a timeout, a connection refusal, an
+unparseable peer body — is translated to `DOWNSTREAM_UNAVAILABLE` with the peer named in
+`detail` and **no** extension members carried, because there is nothing authoritative to carry.
+
+`QuotaRejectionPropagationTest` asserts it directly: a WireMock Quota returning 422
+`QUOTA_EXCEEDED` with `exhausted: ["CPU"]` must produce an orchestrator 422 whose body still
+carries `exhausted: ["CPU"]`, with `instance = /api/v1/resources`.
 
 ---
 
@@ -489,7 +526,7 @@ spring:
     username: ${DB_USER:quota_user}
     password: ${DB_PASSWORD:changeme}
     hikari:
-      maximum-pool-size: ${DB_POOL_MAX:10}
+      maximum-pool-size: ${DB_POOL_MAX:25}   # 20 concurrent Challenge 1 reserves + headroom
   jpa:
     hibernate:
       ddl-auto: validate            # NFR-23: Flyway owns the schema
@@ -499,6 +536,97 @@ spring:
     enabled: true
     locations: classpath:db/migration
 ```
+
+The orchestrator's file is published too, because it is the one service where the property keys
+are not obvious from the variable names — and because the tests in `infrastructure-design.md`
+§7.2 override those keys by name. **The property key is the contract between
+`application.yml` and `@Value`/`@ConfigurationProperties`; the environment variable is the
+contract with whoever runs the service.** Both are fixed here.
+
+```yaml
+# services/resource/src/main/resources/application.yml
+server:
+  port: ${SERVER_PORT:8082}
+spring:
+  application:
+    name: resource
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:resource_db}
+    username: ${DB_USER:resource_user}
+    password: ${DB_PASSWORD:changeme}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX:25}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate.jdbc.time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+# --- peers: one block per peer, read by RestClientConfig (§3.2) -----------------
+peers:
+  quota:
+    url: ${QUOTA_SERVICE_URL:http://localhost:8081}
+    connect-timeout-ms: ${QUOTA_CONNECT_TIMEOUT_MS:2000}
+    read-timeout-ms: ${QUOTA_READ_TIMEOUT_MS:2000}
+  provider:
+    url: ${PROVIDER_SERVICE_URL:http://localhost:8085}
+    connect-timeout-ms: ${PROVIDER_CONNECT_TIMEOUT_MS:2000}
+    read-timeout-ms: ${PROVIDER_READ_TIMEOUT_MS:10000}
+  billing:
+    url: ${BILLING_SERVICE_URL:http://localhost:8083}
+    connect-timeout-ms: ${BILLING_CONNECT_TIMEOUT_MS:2000}
+    read-timeout-ms: ${BILLING_READ_TIMEOUT_MS:3000}
+  notification:
+    url: ${NOTIFICATION_SERVICE_URL:http://localhost:8084}
+    connect-timeout-ms: ${NOTIFICATION_CONNECT_TIMEOUT_MS:2000}
+    read-timeout-ms: ${NOTIFICATION_READ_TIMEOUT_MS:2000}
+
+# --- resilience baseline (§8.2): one policy, all peers -------------------------
+retry:
+  max-attempts: ${RETRY_MAX_ATTEMPTS:3}
+  initial-backoff-ms: ${RETRY_INITIAL_BACKOFF_MS:200}
+  multiplier: ${RETRY_MULTIPLIER:2.0}
+  max-backoff-ms: ${RETRY_MAX_BACKOFF_MS:2000}
+  jitter-ratio: ${RETRY_JITTER_RATIO:0.5}
+
+# --- saga executor (§3.3) ------------------------------------------------------
+saga:
+  pool:
+    core: ${SAGA_POOL_CORE:4}
+    max: ${SAGA_POOL_MAX:8}
+    queue: ${SAGA_POOL_QUEUE:100}
+
+# --- Challenge 2 housekeeping (D5) --------------------------------------------
+idempotency:
+  retention-hours: ${IDEMPOTENCY_RETENTION_HOURS:24}
+  sweep-interval-ms: ${IDEMPOTENCY_SWEEP_INTERVAL_MS:3600000}
+
+# --- the rate passed to Billing (FR-28) ---------------------------------------
+billing:
+  rate-per-cpu-hour: ${BILLING_RATE_PER_CPU_HOUR:0.12}
+```
+
+Property key ↔ environment variable mapping, in full:
+
+| Property key | Environment variable | Read by |
+|--------------|---------------------|---------|
+| `peers.quota.url`, `peers.quota.connect-timeout-ms`, `peers.quota.read-timeout-ms` | `QUOTA_SERVICE_URL`, `QUOTA_CONNECT_TIMEOUT_MS`, `QUOTA_READ_TIMEOUT_MS` | `RestClientConfig` → `QuotaClient` |
+| `peers.provider.*` | `PROVIDER_SERVICE_URL`, `PROVIDER_CONNECT_TIMEOUT_MS`, `PROVIDER_READ_TIMEOUT_MS` | `ProviderClient` |
+| `peers.billing.*` | `BILLING_SERVICE_URL`, `BILLING_CONNECT_TIMEOUT_MS`, `BILLING_READ_TIMEOUT_MS` | `BillingClient` |
+| `peers.notification.*` | `NOTIFICATION_SERVICE_URL`, `NOTIFICATION_CONNECT_TIMEOUT_MS`, `NOTIFICATION_READ_TIMEOUT_MS` | `NotificationClient` |
+| `retry.*` | `RETRY_MAX_ATTEMPTS`, `RETRY_INITIAL_BACKOFF_MS`, `RETRY_MULTIPLIER`, `RETRY_MAX_BACKOFF_MS`, `RETRY_JITTER_RATIO` | the shared retry policy (§8.2) |
+| `saga.pool.core` / `.max` / `.queue` | `SAGA_POOL_CORE`, `SAGA_POOL_MAX`, `SAGA_POOL_QUEUE` | `AsyncConfig.sagaExecutor` (§3.3) |
+| `idempotency.retention-hours` / `.sweep-interval-ms` | `IDEMPOTENCY_RETENTION_HOURS`, `IDEMPOTENCY_SWEEP_INTERVAL_MS` | `IdempotencyService`, the sweep job (D5) |
+| `billing.rate-per-cpu-hour` | `BILLING_RATE_PER_CPU_HOUR` | `ProvisioningSaga` → `BillingClient` (FR-28) |
+
+Spring's relaxed binding means the environment variable and the property key never have to be
+restated in code: `${PROVIDER_SERVICE_URL:...}` in the YAML is the only place the variable name
+appears, and `peers.provider.url` is the only name Java and the tests use. That is why
+`@DynamicPropertySource` in `infrastructure-design.md` §7.2 can override `peers.provider.url`
+without the test knowing anything about environment variables.
 
 ### 5.2 Quota service variables
 
@@ -510,7 +638,7 @@ spring:
 | `DB_NAME` | database | `quota_db` | optional |
 | `DB_USER` | least-privilege user (NFR-2) | `quota_user` | optional |
 | `DB_PASSWORD` | that user's password | `changeme` | optional locally, **required** anywhere real |
-| `DB_POOL_MAX` | Hikari max pool size | `10` | optional |
+| `DB_POOL_MAX` | Hikari max pool size; 25 because Challenge 1 sends 20 concurrent reserves (`infrastructure-design.md` §5.3) | `25` | optional |
 | `LOG_LEVEL` | root log level | `INFO` | optional |
 | `LOG_LEVEL_APP` | `com.crm` log level | `INFO` | optional |
 
@@ -521,7 +649,7 @@ spring:
 | `SERVER_PORT` | HTTP port | `8082` | optional |
 | `DB_HOST` / `DB_PORT` | PostgreSQL location | `localhost` / `5432` | optional |
 | `DB_NAME` / `DB_USER` / `DB_PASSWORD` | database and credentials | `resource_db` / `resource_user` / `changeme` | optional locally |
-| `DB_POOL_MAX` | Hikari max pool size | `10` | optional |
+| `DB_POOL_MAX` | Hikari max pool size; 25, as above — each of the 20 parallel Challenge 1 requests holds a connection across the synchronous quota call | `25` | optional |
 | `LOG_LEVEL` / `LOG_LEVEL_APP` | log levels | `INFO` | optional |
 | `QUOTA_SERVICE_URL` | real peer (U1) | `http://localhost:8081` | optional |
 | `PROVIDER_SERVICE_URL` | peer; WireMock during U1 | `http://localhost:8085` | optional |
@@ -556,6 +684,62 @@ Three properties of the design, no Docker work:
 Forward reference: Assignment 2 supplies the same jar with a different environment block, plus
 `/health` as the container probe. Nothing in U1 is to be changed then — and nothing about Docker
 is being built now.
+
+### 5.5 OpenAPI exposure and the committed spec (NFR-11)
+
+Configuration, because springdoc is configured the same way everything else here is, and
+because the *design* decisions are where the spec lives and how the error codes reach it.
+
+```yaml
+springdoc:
+  api-docs:
+    path: /v3/api-docs                # JSON; /v3/api-docs.yaml serves the YAML form
+    enabled: true
+  swagger-ui:
+    enabled: ${SWAGGER_UI_ENABLED:true}   # convenient locally; a single switch to turn off
+  writer-with-order-by-keys: true     # deterministic key order, so the committed diff is meaningful
+  writer-with-default-pretty-printer: true
+```
+
+| Decision | Choice | Why |
+|----------|--------|-----|
+| Where the spec is exported | `services/<service>/openapi.yaml`, committed next to the `pom.xml` | NFR-11 says committed per service; next to the project is where a reader of that service looks |
+| How it is produced | `curl http://localhost:<port>/v3/api-docs.yaml -o openapi.yaml` after the service starts, wrapped in `scripts/export-openapi.ps1` so both services are done in one command | A build-time plugin (`springdoc-openapi-maven-plugin`) was rejected: it starts the application during `verify`, which needs a database up, so a developer without PostgreSQL could no longer build. Exporting from a running service keeps `mvnw package` free of infrastructure |
+| Determinism | `writer-with-order-by-keys` plus the pretty printer | Without a stable key order, every export is a large diff and the "committed spec matches a fresh one" check in `nfr-requirements.md` §3 becomes unusable |
+| Error codes in the spec | `@ApiResponse` annotations on every operation, one per status it can return, each `description` naming the `code` from §2.2 and referencing the shared `ProblemDetail` schema | Keeps the spec and `functional-design.md` §3/§4 saying the same thing. The vocabulary table is still the single source; the annotations quote it |
+
+```java
+@Operation(summary = "Provision a resource")
+@ApiResponses({
+    @ApiResponse(responseCode = "202", description = "Accepted; quota reserved, saga queued"),
+    @ApiResponse(responseCode = "400", description = "IDEMPOTENCY_KEY_REQUIRED or VALIDATION_FAILED",
+                 content = @Content(mediaType = "application/problem+json",
+                                    schema = @Schema(implementation = ProblemDetail.class))),
+    @ApiResponse(responseCode = "422", description = "QUOTA_EXCEEDED, TIER_FORBIDS_RESOURCE_TYPE or IDEMPOTENCY_PAYLOAD_MISMATCH"),
+    @ApiResponse(responseCode = "503", description = "DOWNSTREAM_UNAVAILABLE")
+})
+@PostMapping("/api/v1/resources")
+ResponseEntity<ProvisionAcceptedResponse> provision(...) { ... }
+```
+
+The generated spec cannot be diffed against a committed copy until the toolchain exists, so that
+check stays on `nfr-requirements.md` §7's Build and Test list; the configuration and the export
+path above are the part that is decided now.
+
+### 5.6 Dependency pinning (NFR-24)
+
+| Rule | How |
+|------|-----|
+| One source of versions | Each service's `pom.xml` inherits from `spring-boot-starter-parent` **3.5.x with the patch version written out** — not a range, not a property a child can drift from. The Spring Boot BOM then pins every starter, Jackson, Hibernate and the PostgreSQL driver transitively |
+| Anything outside the BOM | An explicit `<version>` in a `<properties>` block: WireMock, Testcontainers (its own BOM, pinned), springdoc. No dependency without a resolvable fixed version |
+| Forbidden | `LATEST`, `RELEASE`, open ranges such as `[3.0,4.0)`, and `-SNAPSHOT` of anything |
+| Plugins too | Every plugin carries a version, inherited from the parent or stated. An unpinned plugin is the same hazard as an unpinned dependency, and is the one people forget |
+| Evidence | `./mvnw dependency:tree` captured once per service into `evidence/infra/dependency-tree.txt` (needs Maven, so Build and Test) |
+
+This is a security-baseline item (`nfr-requirements.md` §1): the point is a reproducible build,
+not vulnerability scanning, which is out of scope. The honest limitation is that pinning makes
+the build reproducible without making it *current* — nothing here updates dependencies, and no
+scanner runs.
 
 ---
 
@@ -742,14 +926,19 @@ This stage is complete when approved. Specifically:
   RFC 9457 structure are fixed (section 1).
 - The error model is fully specified: the exception hierarchy, one `@RestControllerAdvice`, one
   construction point for problem bodies, the **complete** `code` → status → meaning → emitting
-  service vocabulary, and a worked example body per error class (section 2).
+  service vocabulary, a worked example body per error class, and the propagation rule that
+  carries a peer's extension members (`exhausted[]`) through the orchestrator so AC-1.3 holds
+  where the Challenge 1 script actually reads it (section 2, including §2.4).
 - Correlation-ID handling is specified inbound, outbound and **across the async boundary**, with
   both the MDC task decorator and the task-payload field, and with the reason both exist
   (section 3).
 - Structured JSON logging is specified: encoder choice, mandatory fields, levels per event class,
   the NFR-17 prohibitions, and example happy-path and compensation-path lines (section 4).
 - Every environment variable for both services is listed with its default and where defaults
-  live, with the NFR-20 argument for why no code changes between local and container (section 5).
+  live, **both** services' `application.yml` are published with the property-key ↔ env-var
+  mapping, and the NFR-20 argument for why no code changes between local and container is made
+  (section 5). OpenAPI exposure and export (NFR-11) and dependency pinning (NFR-24) are
+  specified in §5.5 and §5.6 rather than left implicit.
 - Flyway conventions are fixed, including the PostgreSQL 15+ privilege correction and why the
   `units.md` draft is insufficient (section 6).
 - `/health` content and the deliberate exclusion of peer health are fixed (section 7).

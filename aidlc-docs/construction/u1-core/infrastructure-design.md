@@ -219,6 +219,11 @@ CREATE TABLE reservations (
     failure_reason    text,
     simulate_failure  varchar(40),
     created_at        timestamptz  NOT NULL DEFAULT now(),
+
+    -- The DEFAULT covers the INSERT only. Every later write of this column is done by
+    -- ReservationService.complete / .fail, which set status, failure_reason and
+    -- updated_at = clock.instant() in one UPDATE (functional-design.md §5.2, §9.5).
+    -- No trigger: the one code path that changes the row already has the value.
     updated_at        timestamptz  NOT NULL DEFAULT now(),
 
     CONSTRAINT ck_reservations_status CHECK (status IN ('PENDING', 'COMPLETED', 'FAILED')),
@@ -232,6 +237,8 @@ CREATE TABLE reservations (
 COMMENT ON COLUMN reservations.simulate_failure IS
   'FR-46. The X-Simulate-Failure header persisted at request time and replayed by the background
    saga on the matching downstream call, so injection survives the async boundary.';
+COMMENT ON COLUMN reservations.updated_at IS
+  'Written by ReservationService.complete/.fail on each status change; DEFAULT applies at insert only.';
 
 -- Query pattern: a tenant''s reservations for demo queries and troubleshooting.
 CREATE INDEX ix_reservations_tenant ON reservations (tenant_id);
@@ -244,7 +251,16 @@ CREATE INDEX ix_reservations_tenant ON reservations (tenant_id);
 CREATE TABLE idempotency_records (
     idempotency_key      varchar(200) PRIMARY KEY,
     request_fingerprint  char(64)     NOT NULL,
-    reservation_id       uuid         REFERENCES reservations (reservation_id) ON DELETE RESTRICT,
+
+    -- Deliberately NOT a foreign key, matching application-design.md §4.2, which lists this as
+    -- a plain reference. Two reasons, both from the algorithm in functional-design.md §9.3:
+    --   1. The record is inserted FIRST, with a reservation id minted before the reservations
+    --      row exists (step (a) precedes step (c)). A non-deferrable FK would fail that insert
+    --      on every first-time provisioning request.
+    --   2. On the quota-rejection path the record is committed with a reservation that is never
+    --      created at all, because the key owns the 422 answer rather than a reservation.
+    reservation_id       uuid,
+
     response_status      integer,
     response_body        text,
     state                varchar(20)  NOT NULL,
@@ -274,6 +290,7 @@ CREATE INDEX ix_idempotency_expires_at ON idempotency_records (expires_at);
 | `ck_quota_reservations_released_at` | **BR7** | `RELEASED` and `released_at` can never disagree, so the "released exactly once" evidence is trustworthy |
 | `ck_tenant_quota_*_within_limit` | **BR1** (defence in depth) | Usage above the limit is unwritable. The atomic UPDATE remains the mechanism — these catch a future code path that bypassed it |
 | `idempotency_records_pkey` | **BR2** | Of N simultaneous identical requests, exactly one proceeds; the rest replay |
+| `tenants_pkey` | — (A2) | A client-supplied `tenantId` cannot be taken twice; the duplicate insert is recovered through `SavepointGuard` and rendered as 409 `TENANT_ALREADY_EXISTS` (`functional-design.md` §12.3) |
 | `ck_idempotency_fingerprint_hex` + `request_fingerprint NOT NULL` | **BR3** | A record always has a comparable fingerprint, so a mismatch is always detectable |
 | `uq_reservations_resource_id` | **BR2** | A second request handle for one resource is impossible |
 | `ck_resources_status` + `ck_resources_*_has_*` | **BR4** | Only the five lifecycle states exist, and an `ACTIVE` row without `activated_at` (or a `FAILED` row without a reason) cannot be written |
@@ -421,9 +438,12 @@ UPDATE tenant_quota SET cpu_used = 0, ram_used_gb = 0, instance_used = 0;
 TRUNCATE TABLE idempotency_records, reservations, resources;
 ```
 
-Order matters: `idempotency_records` references `reservations`, which references `resources`, so
-a single `TRUNCATE` listing all three (or `CASCADE`) is required. Tenants and limits are left
-alone — resetting usage is enough, and keeping the tenants makes a rerun one step shorter.
+`reservations` and `resources` must be truncated **in the same statement** (or with `CASCADE`):
+`reservations.resource_id` is a real foreign key to `resources`, and PostgreSQL refuses to
+truncate a referenced table on its own. `idempotency_records` carries no foreign key (§2.2), so
+it is listed only for convenience — one statement is simpler to keep correct than three.
+Tenants and limits are left alone: resetting usage is enough, and keeping the tenants makes a
+rerun one step shorter.
 
 ---
 
@@ -443,7 +463,7 @@ operational contract.
 | `DB_NAME` | database name | `quota_db` | optional |
 | `DB_USER` | least-privilege user | `quota_user` | optional |
 | `DB_PASSWORD` | user password | `changeme` | optional locally, **required** elsewhere |
-| `DB_POOL_MAX` | Hikari maximum pool size | `10` | optional |
+| `DB_POOL_MAX` | Hikari maximum pool size. **25, not the Hikari default of 10**: Challenge 1 sends 20 concurrent reserve calls, each holding one connection for the atomic UPDATE (§5.3) | `25` | optional |
 | `LOG_LEVEL` | root log level | `INFO` | optional |
 | `LOG_LEVEL_APP` | `com.crm` log level | `INFO` | optional |
 
@@ -455,7 +475,7 @@ operational contract.
 | `DB_HOST` / `DB_PORT` | PostgreSQL location | `localhost` / `5432` | optional |
 | `DB_NAME` | database name | `resource_db` | optional |
 | `DB_USER` / `DB_PASSWORD` | credentials | `resource_user` / `changeme` | optional locally |
-| `DB_POOL_MAX` | Hikari maximum pool size | `10` | optional |
+| `DB_POOL_MAX` | Hikari maximum pool size. **25** (§5.3) | `25` | optional |
 | `LOG_LEVEL` / `LOG_LEVEL_APP` | log levels | `INFO` | optional |
 | `QUOTA_SERVICE_URL` | real peer (same unit) | `http://localhost:8081` | optional |
 | `PROVIDER_SERVICE_URL` | peer; point at WireMock during U1 | `http://localhost:8085` | optional |
@@ -478,6 +498,24 @@ operational contract.
 Every variable is optional for a local run: both services start against a local PostgreSQL with
 an empty environment (NFR-19). `DB_PASSWORD` is the one that must be supplied anywhere that is
 not a developer laptop.
+
+### 5.3 Why `DB_POOL_MAX` is 25 and not the Hikari default of 10
+
+Challenge 1 fires **20 simultaneous** `POST /api/v1/resources` (§7.3). Each of those requests
+holds one orchestrator connection for the whole synchronous transaction — the idempotency-key
+insert, the blocking HTTP call to Quota, and the two row inserts — and causes one concurrent
+reserve on Quota, which holds one Quota connection for the atomic conditional UPDATE. With a
+pool of 10, both services would run at half concurrency: Hikari does not fail, it **queues**
+(up to `connectionTimeout`, 30 s by default), so the counts in the evidence would still be
+correct but the wall-clock timings would be a queueing artefact rather than the behaviour the
+timeout analysis in `nfr-design.md` §8.1 describes. A reviewer reading a slow run should not
+have to work out which.
+
+25 is 20 plus headroom for the polling reads, `/health` and the idempotency sweep that run
+alongside. It is well inside PostgreSQL's default `max_connections` of 100 even with both U1
+services plus the U2–U4 services at the same default. The pool is still bounded, deliberately:
+the point of the frozen design is that over-allocation is prevented by the SQL predicate, not by
+restricting how many requests can arrive at once.
 
 ---
 
@@ -616,11 +654,28 @@ InOrder order = inOrder(/* journal-derived sequence */);                 // prov
 | Script | WireMock role | Asserted output |
 |--------|---------------|-----------------|
 | `scripts/challenge1-concurrency.ps1` | Default stubs; 20 parallel `POST /api/v1/resources` for `tnt-chal1-001`, each 4 CPU / 8 GB, a **distinct** `Idempotency-Key` per request so Challenge 2 does not mask Challenge 1 | 5 × 202, 15 × 422 `QUOTA_EXCEEDED`; `cpu_used = 20`; 5 `RESERVED` ledger rows (AC-1.2 to AC-1.4) |
-| `scripts/challenge2-idempotency.ps1` | Default stubs; 10 sequential repeats of one key, then 5 concurrent repeats of a second key, then one reuse with an altered body | identical 202 bodies incl. the same `resourceId`; exactly 1 `resources` row and 1 `idempotency_records` row per key; 422 `IDEMPOTENCY_PAYLOAD_MISMATCH` on the altered body; one provider call in the journal (AC-2.1 to AC-2.4) |
+| `scripts/challenge2-idempotency.ps1` | Default stubs; 10 sequential repeats of one key, then **10 concurrent** repeats of a second key (AC-2.3 asks for ten, so the script fires ten — matching `IdempotencyConcurrencyIT`), then one reuse with an altered body | identical 202 bodies incl. the same `resourceId`; exactly 1 `resources` row and 1 `idempotency_records` row per key; 422 `IDEMPOTENCY_PAYLOAD_MISMATCH` on the altered body; one provider call in the journal (AC-2.1 to AC-2.4) |
 | `scripts/challenge3-saga.ps1` | **Forced-503 Billing stub** via `X-Simulate-Failure: billing:always-fail` | `resources.status = FAILED` with `failure_reason`; `provider_instance_id` cleared; `DELETE /provider/instances/...` then quota release in the journal; `tenant_quota` back to its pre-request values; `quota_reservations.state = RELEASED`; `saga.compensation.step order=1,2` log lines (AC-3.1 to AC-3.8) |
 
 Each script captures command, output and a timestamp, plus the before/after `SELECT`s, into
 `evidence/challenge-<n>/` (ER-1 to ER-4). All three are re-runnable after `scripts/reset.ps1`.
+
+### 7.4 Evidence file names
+
+Fixed here so the traceability table in `functional-design.md` §12.1 can name files rather than
+folders, which is what DOC-4 and ER-5 ask for.
+
+| Folder | Files | Written by |
+|--------|-------|-----------|
+| `evidence/challenge-1/` | `output.txt` (counted 202/422 results), `db-before.txt`, `db-after.txt` (`tenant_quota` + ledger rows), `explanation.md` (why check-then-update fails, AC-1.6) | `challenge1-concurrency.ps1` |
+| `evidence/challenge-2/` | `output.txt` (first call, sequential repeats, 10 concurrent repeats, the mismatch 422), `db-after.txt`, `replay-logs.txt` (`idempotency.replay` lines, AC-2.5) | `challenge2-idempotency.ps1` |
+| `evidence/challenge-3/` | `output.txt`, `db-before.txt`, `db-after.txt` (resource `FAILED`, quota restored, ledger `RELEASED`), `compensation-logs.txt` (`saga.compensation.step order=1,2`, AC-3.3) | `challenge3-saga.ps1` |
+| `evidence/e2e/` | `e2e-output.txt` (main transaction plus one failure case, including the WireMock journal) | `e2e.ps1` (TR-6) |
+| `evidence/unit-tests/` | `u1-test-report.txt` (Surefire summary for both services, naming the BR tests) | the Build and Test stage |
+| `evidence/infra/` | `db-privileges.txt` (the §3.2 verification commands, NFR-2), `dependency-tree.txt` (NFR-24) | the Build and Test stage |
+
+Every path above is a forward commitment, not an artefact that exists yet: the scripts
+themselves are emitted at Code Generation and run in Build and Test.
 
 ---
 
@@ -655,8 +710,14 @@ abstract class PostgresTestBase {
 | `IdempotencyConcurrencyIT` | **BR2** | 10 concurrent identical `POST /api/v1/resources` (WireMock peers) → 1 `resources` row, 1 `idempotency_records` row, identical bodies (TR-5) |
 | `IdempotencyPayloadMismatchIT` | **BR3** | same key, altered body → 422, and the first record unchanged |
 | `TerminationIdempotencyIT` | **BR7** (orchestrator gate) | concurrent + repeated terminations → one teardown, one quota release call in the journal |
+| `TenantCreationConflictIT` | A2's 409 | duplicate client-supplied `tenantId` → 409 `TENANT_ALREADY_EXISTS`, one `tenants` row (`functional-design.md` §12.3) |
 
-**Docker must be running** for all five. Without a reachable daemon they fail at container
+Two of these also prove the savepoint recovery of `functional-design.md` §7.2.1 rather than just
+the constraint: `IdempotencyConcurrencyIT` and `QuotaReleaseLedgerIT.reserveAfterReleaseIsRejected`
+only pass if the loser of the duplicate-key race can still read inside its transaction. A stub
+guard in the unit tests cannot show that, which is precisely why these two are database-backed.
+
+**Docker must be running** for all six. Without a reachable daemon they fail at container
 startup, not at an assertion — so the README states the prerequisite, and `scripts/verify-toolchain.ps1`
 checks `docker ps` before the suite is suggested. `.withReuse(true)` needs
 `testcontainers.reuse.enable=true` in `~/.testcontainers.properties`; without it the container
@@ -714,12 +775,13 @@ This stage is complete when approved. Specifically:
 - The PostgreSQL setup script is corrected for PostgreSQL 15+ schema privileges, with the reason
   the approved `units.md` draft is insufficient stated explicitly (§3).
 - Every environment variable for both services is tabulated with purpose, default and whether it
-  is required (§5).
+  is required, including the connection-pool sizing that Challenge 1's concurrency demands (§5).
 - Local run instructions give start order, ports and the exact exports that point the
   orchestrator at WireMock instead of real peers (§6).
 - The WireMock setup is specified in both modes, with the stub mappings for Provider, Billing and
   Notification including the forced-503 Billing stub that produces the Challenge 3C compensation
-  evidence, and how each of the three challenge scripts drives it (§7).
+  evidence, how each of the three challenge scripts drives it, and the evidence file names the
+  traceability table in `functional-design.md` §12.1 points at (§7, §7.4).
 - The Testcontainers configuration for the BR1/BR3/BR7 tests is specified, with the Docker
   prerequisite stated plainly (§8).
 - Forward-compatibility notes for Assignment 2 are recorded without any Docker work being done

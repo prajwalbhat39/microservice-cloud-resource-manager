@@ -75,7 +75,8 @@ com.crm.quota
 │       └── QuotaService.java                 // FR-7 to FR-10, BR1, BR7, BR8
 ├── persistence
 │   ├── entity      { Tenant, TenantQuota, QuotaReservation }
-│   └── repository  { TenantRepository, TenantQuotaRepository, QuotaReservationRepository }
+│   ├── repository  { TenantRepository, TenantQuotaRepository, QuotaReservationRepository }
+│   └── SavepointGuard.java                   // duplicate-key recovery inside one live transaction (§7.2.1)
 ├── common                                    // the reference cross-cutting implementation
 │   ├── error       { ApiException + subclasses, ErrorCode, ProblemDetailsFactory, GlobalExceptionHandler }
 │   └── web         { CorrelationIdFilter }
@@ -116,7 +117,8 @@ com.crm.resource
 │       └── ResourceQueryService.java         // FR-17, FR-18, FR-24 support
 ├── persistence
 │   ├── entity      { Resource, Reservation, IdempotencyRecord }
-│   └── repository  { ResourceRepository, ReservationRepository, IdempotencyRecordRepository }
+│   ├── repository  { ResourceRepository, ReservationRepository, IdempotencyRecordRepository }
+│   └── SavepointGuard.java                   // copied from Quota; duplicate-key recovery (§7.2.1)
 ├── client                                    // outbound REST, one class per peer
 │   ├── QuotaClient.java        (real peer, :8081)
 │   ├── ProviderClient.java     (WireMock in U1, :8085 later)
@@ -134,7 +136,7 @@ com.crm.resource
 | Root package `com.crm.resource` | `com.crm.orchestrator` | The service, its database (`resource_db`), its user and its API paths are all named *resource*; a third name for the same thing costs more than it explains. The orchestration role is carried by class names (`ProvisioningSaga`), where it is visible at the point of use |
 | Cross-cutting code copied into each service's `common` package | A shared `crm-common` Maven library | NFR-5 forbids a shared code library between services. Copying is the deliberate cost of service independence, and the duplication is ~5 small classes |
 | Business rules as named domain classes (`TierPolicy`, `ResourceLifecycle`) | Rules inline in the controllers or in repository default methods | BR1–BR8 must each trace to one code location and one test (DOC-4). A rule inline in a controller cannot be unit-tested without a web context |
-| Peer access through one class per peer (`BillingClient`) | One generic `PeerHttpClient` with URL parameters | Each peer has its own timeout, its own retry policy and its own simulate-failure routing (section 9). A generic client would push all of that into call sites |
+| Peer access through one class per peer (`BillingClient`) | One generic `PeerHttpClient` with URL parameters | Each peer has its own pair of timeouts, its own **retry predicate** (which failures are worth retrying — see `nfr-design.md` §8.2, where Quota retries connect failures only) and its own simulate-failure routing (section 9). The backoff parameters themselves are global (`RETRY_*`), deliberately: one policy is easier to defend than four. A generic client would push the per-peer part into call sites |
 
 ---
 
@@ -501,7 +503,7 @@ the invariants. All instants are UTC (NFR-22).
 | Element | Kind | Invariants it upholds |
 |---------|------|----------------------|
 | `Resource` | entity (`resources`) | `status` is one of five values. `ACTIVE` ⇒ `activated_at` set. `FAILED` ⇒ `failure_reason` set. `TERMINATED` ⇒ `terminated_at` set. Transitions only along section 6's graph (BR4) |
-| `Reservation` | entity (`reservations`) | One row per provisioning request. At most one row per `resource_id` (`UNIQUE`). `PENDING` is non-terminal; `COMPLETED` and `FAILED` are terminal. `FAILED` ⇒ `failure_reason` set. Holds the persisted `X-Simulate-Failure` directive (FR-46) |
+| `Reservation` | entity (`reservations`) | One row per provisioning request. At most one row per `resource_id` (`UNIQUE`). `PENDING` is non-terminal; `COMPLETED` and `FAILED` are terminal. `FAILED` ⇒ `failure_reason` set. Holds the persisted `X-Simulate-Failure` directive (FR-46). `created_at` and `updated_at` are equal at insert; **`updated_at` is maintained by `ReservationService`**, which writes `clock.instant()` into it in the same statement as every status change — PostgreSQL's `DEFAULT now()` covers the insert only and no trigger exists (see section 9.5) |
 | `IdempotencyRecord` | entity (`idempotency_records`) | PK is the client's key — the uniqueness guard for BR2/BR3. `request_fingerprint` is a 64-char SHA-256 hex. `COMPLETED` ⇒ `response_status` and `response_body` set. `expires_at = created_at + 24h` |
 | `ResourceStatus` | enum | `REQUESTED`, `PROVISIONING`, `ACTIVE`, `FAILED`, `TERMINATED` |
 | `ReservationStatus` | enum | `PENDING`, `COMPLETED`, `FAILED` |
@@ -649,11 +651,14 @@ public ReserveOutcome reserve(ReserveQuotaCommand cmd) {
     tierPolicy.assertTypeAllowed(tenant.getTier(), cmd.type());   // -> 422 TIER_FORBIDS_RESOURCE_TYPE
 
     // 3. Ledger first: UNIQUE(resource_id) makes a duplicate reserve impossible (BR7, NFR-27).
-    try {
-        quotaReservationRepository.saveAndFlush(
-            QuotaReservation.reserved(cmd.resourceId(), cmd.tenantId(), cmd.cpu(), cmd.ramGb()));
-    } catch (DataIntegrityViolationException duplicate) {
-        return replayExistingLedgerRow(cmd);   // 200 replay=true, or 409 if already RELEASED
+    //    The insert runs inside a SAVEPOINT, so that after a duplicate-key violation the
+    //    transaction is still usable and the replay below can actually read (see §7.2.1).
+    ReserveOutcome duplicate = savepointGuard.insertOrRecover(
+            () -> quotaReservationRepository.saveAndFlush(
+                      QuotaReservation.reserved(cmd.resourceId(), cmd.tenantId(), cmd.cpu(), cmd.ramGb())),
+            () -> replayExistingLedgerRow(cmd));   // 200 replay=true, or 409 if already RELEASED
+    if (duplicate != null) {
+        return duplicate;                          // same resourceId: nothing is added to tenant_quota
     }
 
     // 4. THE decision. One statement, no window.
@@ -681,6 +686,82 @@ Four points this ordering buys:
   never decides anything, so its staleness is harmless. This distinction is worth stating in
   the report: the mechanism is the row count; the message is cosmetics.
 - **No retry.** A zero-row result is a final business answer, not a transient conflict.
+
+### 7.2.1 Recovering from a duplicate-key violation: `SavepointGuard`
+
+Both challenge guards in U1 use a unique-constraint insert as the concurrency mechanism and
+then need to *read* the row that beat them: the ledger row here (BR7, step 3 above) and the
+idempotency record in section 9.2 (BR2, BR3). That read is not free.
+
+**The failure mode being designed around.** In PostgreSQL a constraint violation aborts the
+whole transaction. Every subsequent statement on that connection is refused with *"current
+transaction is aborted, commands ignored until end of transaction block"* until the
+transaction ends. Spring does **not** insert a savepoint automatically just because the
+application caught `DataIntegrityViolationException`. So a plain
+`catch (DataIntegrityViolationException e) { repository.findBy...(); }` inside an
+`@Transactional` method cannot work: the catch block is reached, and then the recovery read
+fails. That would break the exact branches the challenges rest on — the replayed reserve
+(NFR-27) and the replayed 202 (AC-2.1, AC-2.3) — and it would break them *only under
+concurrency*, which is the worst possible place for it to be a surprise in the skeleton.
+
+**The mechanism.** Wrap the guarded insert in a SQL `SAVEPOINT`. Rolling back to the savepoint
+discards the failed statement and leaves the surrounding transaction live, so the recovery read
+and the rest of the method proceed normally.
+
+```java
+// com.crm.quota.persistence.SavepointGuard   (copied verbatim into com.crm.resource.persistence)
+@Component
+public class SavepointGuard {
+
+    private final EntityManager entityManager;   // constructor-injected
+
+    /**
+     * Runs {@code insert} inside a savepoint.
+     * Returns {@code null} when the insert succeeded (the caller carries on).
+     * On a duplicate-key violation: roll back TO THE SAVEPOINT — which leaves the transaction
+     * usable — clear the persistence context so the failed flush is forgotten, then evaluate
+     * {@code onDuplicate} and return its value.
+     */
+    public <T> T insertOrRecover(Runnable insert, Supplier<T> onDuplicate) {
+        TransactionStatus tx = TransactionAspectSupport.currentTransactionStatus();
+        Object savepoint = tx.createSavepoint();
+        try {
+            insert.run();                        // saveAndFlush: the constraint fires here or not at all
+            tx.releaseSavepoint(savepoint);
+            return null;
+        } catch (DataIntegrityViolationException duplicate) {
+            tx.rollbackToSavepoint(savepoint);   // transaction is live again
+            entityManager.clear();               // drop the failed insert from the persistence context
+            return onDuplicate.get();            // safe to read, and safe to throw a 409/422 from here
+        }
+    }
+}
+```
+
+Two implementation requirements that the skeleton must carry, because they are invisible at the
+call site:
+
+1. **Savepoints must be enabled on the transaction manager.** `JpaTransactionManager` only
+   exposes a savepoint manager when nested transactions are allowed, so the skeleton configures
+   `transactionManager.setNestedTransactionAllowed(true)` on the bean. Without it
+   `createSavepoint()` throws `NestedTransactionNotSupportedException` at the first duplicate.
+2. **The insert must be flushed inside the guard** (`saveAndFlush`, not `save`), or the
+   violation surfaces at commit — outside the savepoint, where nothing can recover from it.
+
+Putting the recovery in one small collaborator rather than inline also keeps the two domain
+services unit-testable: `QuotaServiceTest` and `IdempotencyServiceTest` substitute a stub guard
+that runs the insert and calls `onDuplicate` on exception, with no transaction in sight. The
+real behaviour — that a *concurrent* duplicate really does recover against PostgreSQL — is
+proven by the Testcontainers tests (`QuotaReservationAtomicityIT`, `IdempotencyConcurrencyIT`).
+
+**Alternatives considered and rejected.**
+
+| Alternative | Reason rejected |
+|-------------|-----------------|
+| Catch the violation and read in the same transaction, no savepoint | Does not work: PostgreSQL has already aborted the transaction, so the recovery read fails. This is the defect this subsection exists to prevent |
+| Do the recovery read in a `REQUIRES_NEW` transaction | The read would succeed on a second connection, but the *outer* transaction stays aborted, so the replay path could neither write nor commit anything afterwards. It also doubles connection usage on precisely the concurrent path where the pool is tightest |
+| `SELECT` first, insert only if absent | Reintroduces the read-write window that the unique-constraint guard exists to close — the bug Challenge 2 is graded on |
+| Let the violation propagate and retry the whole request in a new transaction | Turns a deterministic replay into a retry loop, and an idempotent reserve into something whose outcome depends on timing. Also contradicts the frozen "no retry loop" decision on Challenge 1 |
 
 ### 7.3 Why the alternatives were rejected (frozen; restated for the report)
 
@@ -814,19 +895,26 @@ typo.
 ```java
 // com.crm.resource.domain.service.IdempotencyService
 IdempotencyDecision beginOrReplay(String key, String fingerprint, UUID candidateReservationId) {
-    try {
-        repository.saveAndFlush(IdempotencyRecord.inProgress(
-                key, fingerprint, candidateReservationId, clock.instant(), /* +24h */));
-        return IdempotencyDecision.proceed();                       // step 3
-    } catch (DataIntegrityViolationException keyExists) {
-        IdempotencyRecord stored = repository.findById(key).orElseThrow();  // see note below
-        if (!stored.getRequestFingerprint().equals(fingerprint)) {
-            throw new IdempotencyPayloadMismatchException(key);     // step 4 -> 422
-        }
-        return stored.getState() == COMPLETED
-                ? IdempotencyDecision.replay(stored)                // step 5
-                : IdempotencyDecision.inFlight(stored.getReservationId());  // step 6
+
+    // The PK insert is the guard. It runs inside a SAVEPOINT (§7.2.1) so that after a
+    // duplicate-key violation this transaction is still live and the stored record can be read.
+    IdempotencyDecision duplicate = savepointGuard.insertOrRecover(
+            () -> repository.saveAndFlush(IdempotencyRecord.inProgress(
+                      key, fingerprint, candidateReservationId, clock.instant(), /* +24h */)),
+            () -> decideFromStoredRecord(key, fingerprint));
+
+    return duplicate != null ? duplicate : IdempotencyDecision.proceed();   // step 3
+}
+
+/** Reached only on a duplicate key, after the savepoint rollback has restored the transaction. */
+private IdempotencyDecision decideFromStoredRecord(String key, String fingerprint) {
+    IdempotencyRecord stored = repository.findById(key).orElseThrow();
+    if (!stored.getRequestFingerprint().equals(fingerprint)) {
+        throw new IdempotencyPayloadMismatchException(key);         // step 4 -> 422
     }
+    return stored.getState() == COMPLETED
+            ? IdempotencyDecision.replay(stored)                    // step 5
+            : IdempotencyDecision.inFlight(stored.getReservationId());  // step 6
 }
 ```
 
@@ -839,6 +927,11 @@ transaction ends, then fails with a duplicate-key error — at which point the r
 and it processes normally. This blocking behaviour is the reason the frozen contract can say
 "fails the insert and waits for or reads the first result" without any application-level
 waiting, polling or locking.
+
+The savepoint of section 7.2.1 is what makes "reads the first result" literally executable: the
+duplicate-key violation would otherwise have aborted the loser's transaction, and its read of
+the winner's record would fail instead of replaying. The guard is the constraint; the savepoint
+is only how the loser survives losing.
 
 The cost is honest and worth stating in the report: the loser holds a database connection for
 as long as the winner's transaction runs, and the winner's transaction contains a synchronous
@@ -922,6 +1015,13 @@ Three deliberate details:
   `QUOTA_EXCEEDED` is a *final answer* about this payload, so it is stored against the key and
   replayed identically. A 503 from an unreachable Quota is not an answer at all, so the key is
   released and the client may retry (see section 13, assumption A3).
+- **The idempotency record is written before the reservation row exists, and that is why
+  `idempotency_records.reservation_id` carries no foreign key.** Step (a) mints
+  `reservationId` and stores it on the record; the `reservations` row is only inserted at step
+  (c). On the rejection path above, the record commits with a `reservationId` whose row is never
+  created at all — correctly, because the key owns the 422 answer, not a reservation. The column
+  is therefore a bare reference exactly as `application-design.md` §4.2 declares it
+  (`infrastructure-design.md` §2.2 carries the matching migration).
 - **`durationSeconds` becomes `expires_at = created_at + durationSeconds`** at insert time
   (FR-23); absent duration leaves the column null and the resource never expires.
 
@@ -1009,6 +1109,14 @@ private void compensate(ProvisioningTask task, String instanceId, boolean meterS
     log.error("saga.compensation.done resourceId={} status=FAILED", task.resourceId());
 }
 ```
+
+**`reservations.updated_at` has exactly one writer.** `ReservationService.complete(id)` and
+`ReservationService.fail(id, reason)` are the only methods that move a reservation off
+`PENDING`, and each writes `status`, `failure_reason` and `updated_at = clock.instant()` in one
+`UPDATE`. The column's `DEFAULT now()` applies to the insert only; nothing else touches the row,
+so `updatedAt` as surfaced by R2 is always the instant the saga reached its outcome. A database
+trigger was considered and rejected: the value is already available on the one code path that
+changes the row, and a trigger would hide that from the skeleton Prajwal implements.
 
 **Why compensation is ordered 3 → 2 → 1.** Reverse order is both what the brief asks for and
 what the domain needs: the meter must stop before the instance it meters disappears (otherwise
@@ -1145,16 +1253,20 @@ computes nor stores money. A worked example for the demo: 4 CPU × 0.12 = **0.48
 
 ### 12.1 Business rules
 
-| Rule | Owner | Class and method that enforces it | Test class and method | Test kind |
-|------|-------|-----------------------------------|----------------------|-----------|
-| **BR1** quota never exceeds tier limits under any concurrency | Quota (U1) | `TenantQuotaRepository.reserveIfWithinLimits` (the atomic conditional UPDATE), called by `QuotaService.reserve` | `QuotaReservationAtomicityIT.exactlyNConcurrentReservationsSucceed` | Testcontainers (TR-3, TR-4) |
-| **BR2** provisioning is idempotent | Orchestrator (U1) | `IdempotencyService.beginOrReplay` + `ProvisioningService.provision` | `IdempotencyServiceTest.replayReturnsStoredResponseWithoutReprocessing`; `IdempotencyConcurrencyIT.tenConcurrentDuplicatesCreateOneResource` | Unit + Testcontainers (TR-5) |
-| **BR3** reused key with a different payload is rejected | Orchestrator (U1) | `IdempotencyService.beginOrReplay` (fingerprint compare on duplicate-key) + `RequestFingerprint.of` | `RequestFingerprintTest.differentPayloadsDifferentFingerprints`; `IdempotencyPayloadMismatchIT.reusedKeyAlteredPayloadReturns422` | Unit + Testcontainers (TR-3) |
-| **BR4** only the defined lifecycle transitions occur; ACTIVE only from PROVISIONING | Orchestrator (U1) | `ResourceLifecycle.transition` / `.canTransition` | `ResourceLifecycleTest.activeOnlyReachableFromProvisioning`; `.illegalTransitionIsRejected` | Unit (TR-2) |
-| **BR5** billing meter stops on termination and accrues nothing after | **Billing (U2) — out of scope for U1** | U1 only calls `BillingClient.stopMeter` from `TerminationService` teardown | U1 asserts the call was made: `TerminationTeardownTest.stopsMeterOnTermination` (WireMock). The rule itself is Karan's `BillingMeterTest` | Out of scope for U1 |
-| **BR6** compensation releases reserved quota in full | Orchestrator (U1) | `ProvisioningSaga.compensate` step (3) → `QuotaClient.release` | `ProvisioningSagaCompensationTest.billingFailureReleasesQuotaAndTerminatesInstance` (WireMock, reverse-order assertion) + Challenge 3C script | Unit + script (TR-7) |
-| **BR7** quota released exactly once | Quota (U1) gate 2; Orchestrator (U1) gate 1 | `QuotaReservationRepository.markReleasedIfReserved` + `QuotaService.release`; `ResourceRepository.markTerminatedIfActive` + `TerminationService.terminate` | `QuotaReleaseLedgerIT.concurrentReleasesDecrementOnce`; `TerminationIdempotencyIT.repeatedTerminationHasNoFurtherEffect` | Testcontainers (TR-3) |
-| **BR8** no CLUSTER on FREE tier | Quota (U1) | `TierPolicy.assertTypeAllowed` | `TierPolicyTest.freeTierMayNotProvisionCluster` | Unit (TR-2) |
+The last column is the one DOC-4 asks for — rule → code → test → **evidence file** — so the
+report's traceability table is a copy of this one rather than a rebuild. Paths are the ones the
+scripts write in `infrastructure-design.md` §7.3.
+
+| Rule | Owner | Class and method that enforces it | Test class and method | Test kind | Evidence file |
+|------|-------|-----------------------------------|----------------------|-----------|---------------|
+| **BR1** quota never exceeds tier limits under any concurrency | Quota (U1) | `TenantQuotaRepository.reserveIfWithinLimits` (the atomic conditional UPDATE), called by `QuotaService.reserve` | `QuotaReservationAtomicityIT.exactlyNConcurrentReservationsSucceed` | Testcontainers (TR-3, TR-4) | `evidence/challenge-1/output.txt` (5 × 202, 15 × 422), `evidence/challenge-1/db-after.txt` (`cpu_used = 20`, 5 `RESERVED` rows), `evidence/challenge-1/explanation.md` |
+| **BR2** provisioning is idempotent | Orchestrator (U1) | `IdempotencyService.beginOrReplay` + `ProvisioningService.provision` | `IdempotencyServiceTest.replayReturnsStoredResponseWithoutReprocessing`; `IdempotencyConcurrencyIT.tenConcurrentDuplicatesCreateOneResource` | Unit + Testcontainers (TR-5) | `evidence/challenge-2/output.txt` (identical bodies, same `resourceId`), `evidence/challenge-2/db-after.txt` (one row per key), `evidence/challenge-2/replay-logs.txt` |
+| **BR3** reused key with a different payload is rejected | Orchestrator (U1) | `IdempotencyService.beginOrReplay` → `decideFromStoredRecord` (fingerprint compare after the savepoint rollback, §7.2.1) + `RequestFingerprint.of` | `RequestFingerprintTest.differentPayloadsDifferentFingerprints`; `IdempotencyPayloadMismatchIT.reusedKeyAlteredPayloadReturns422` | Unit + Testcontainers (TR-3) | `evidence/challenge-2/output.txt` (the 422 case), `evidence/challenge-2/db-after.txt` (first record unchanged) |
+| **BR4** only the defined lifecycle transitions occur; ACTIVE only from PROVISIONING | Orchestrator (U1) | `ResourceLifecycle.transition` / `.canTransition` | `ResourceLifecycleTest.activeOnlyReachableFromProvisioning`; `.illegalTransitionIsRejected` | Unit (TR-2) | `evidence/unit-tests/u1-test-report.txt`; the 409 body in `evidence/e2e/e2e-output.txt` |
+| **BR5** billing meter stops on termination and accrues nothing after | **Billing (U2) — out of scope for U1** | U1 only calls `BillingClient.stopMeter` from `TerminationService` teardown | U1 asserts the call was made: `TerminationTeardownTest.stopsMeterOnTermination` (WireMock). The rule itself is Karan's `BillingMeterTest` | Out of scope for U1 | U1 contributes only the stop-meter journal line in `evidence/e2e/e2e-output.txt`; the rule's own evidence belongs to U2 |
+| **BR6** compensation releases reserved quota in full | Orchestrator (U1) | `ProvisioningSaga.compensate` step (3) → `QuotaClient.release` | `ProvisioningSagaCompensationTest.billingFailureReleasesQuotaAndTerminatesInstance` (WireMock, reverse-order assertion) + Challenge 3C script | Unit + script (TR-7) | `evidence/challenge-3/compensation-logs.txt` (`order=1,2`), `evidence/challenge-3/db-before.txt` and `evidence/challenge-3/db-after.txt` (quota identical before and after), `evidence/challenge-3/output.txt` |
+| **BR7** quota released exactly once | Quota (U1) gate 2; Orchestrator (U1) gate 1 | `QuotaReservationRepository.markReleasedIfReserved` + `QuotaService.release`; `ResourceRepository.markTerminatedIfActive` + `TerminationService.terminate` | `QuotaReleaseLedgerIT.concurrentReleasesDecrementOnce`; `TerminationIdempotencyIT.repeatedTerminationHasNoFurtherEffect` | Testcontainers (TR-3) | `evidence/challenge-3/db-after.txt` (`state = RELEASED`, one `released_at`, usage back to pre-request), `evidence/challenge-1/db-after.txt` (5 ledger rows, no double count) |
+| **BR8** no CLUSTER on FREE tier | Quota (U1) | `TierPolicy.assertTypeAllowed` | `TierPolicyTest.freeTierMayNotProvisionCluster` | Unit (TR-2) | `evidence/unit-tests/u1-test-report.txt`; the 422 for `tnt-free-001` in `evidence/e2e/e2e-output.txt` |
 
 ### 12.2 Functional requirements owned by U1
 
@@ -1182,6 +1294,24 @@ computes nor stores money. A worked example for the demo: 4 CPU × 0.12 = **0.48
 | FR-24 | R6 provides the candidate list; the **schedule** is U4's worker | Out of scope for U1 |
 | FR-26 to FR-45 (except FR-46) | Billing (U2), Provider (U3), Notification + aggregator + worker (U4) | Out of scope for U1 |
 
+### 12.3 Error paths that belong to no single BR or FR
+
+Three codes exist because a real API needs an answer for a case the frozen tables did not
+enumerate (section 13, assumptions A2 and A9). Each still needs a named test, or it is an
+untested branch in the skeleton.
+
+| Code | Endpoint | Where it is raised | Test class and method | Test kind |
+|------|----------|--------------------|----------------------|-----------|
+| `TENANT_ALREADY_EXISTS` (409) | Q1 | `TenantService.create` — the `tenants` PK insert through `SavepointGuard`, recovered and mapped | `TenantServiceTest.duplicateTenantIdMapsTo409` (stub guard); `TenantCreationConflictIT.duplicateTenantIdReturns409` | Unit + Testcontainers |
+| `QUOTA_RESERVATION_ALREADY_RELEASED` (409) | Q4 | `QuotaService.reserve` → `replayExistingLedgerRow`, when the existing ledger row is `RELEASED` | `QuotaServiceTest.reserveOnReleasedLedgerRowReturns409` (stub guard); `QuotaReleaseLedgerIT.reserveAfterReleaseIsRejected` | Unit + Testcontainers |
+| `INVALID_TIER` (422) | Q1 | `TierPolicy.parseTier` on an unknown tier string | `TierPolicyTest.unknownTierStringReturns422` | Unit |
+
+The two 409s share one shape: a duplicate-key insert recovered through `SavepointGuard`
+(§7.2.1), where the recovery inspects the row that already exists and decides whether it is a
+replay (200) or a conflict (409). Testing both halves — the mapping with a stub guard, the real
+constraint with Testcontainers — is deliberate: the unit test proves the decision, the
+integration test proves the recovery actually survives PostgreSQL aborting the statement.
+
 ---
 
 ## 13. Open Questions and Assumptions
@@ -1198,6 +1328,8 @@ Recorded rather than silently resolved, as required. None blocks Code Generation
 | **A6** | Nothing in the frozen inputs covers an orchestrator crash mid-saga, since the saga tables were removed | No recovery scanner. A crashed saga leaves `status = 'PROVISIONING'` with quota held; it is queryable and resolved manually. Documented as a limitation, not hidden | Adding recovery would mean reintroducing coordination state, which is explicitly out of scope |
 | **A7** | `application-design.md` §4.2 does not list a column for the persisted simulate-failure header, but FR-46 requires persisting it | Added `reservations.simulate_failure varchar(40)`. It is internal (no API shape changes), so it extends the data model without touching a frozen contract | None beyond the migration |
 | **A8** | §5.2's list filter is written `?tenantId=&status=` without saying which is required | `tenantId` required, `status` optional. A cross-tenant listing has no caller and would be an accidental data-exposure endpoint | U4's aggregator already sends both |
+| **A9** | `application-design.md` §5.1 freezes Q4's errors as "422 insufficient, 422 BR8 cluster on FREE, 404 tenant", with no answer for a reserve against a `resourceId` whose ledger row is already `RELEASED` | Added **409 `QUOTA_RESERVATION_ALREADY_RELEASED`** (§3.3, §7.2). Reserving again for a resource whose quota has already been given back is a state conflict, not a fresh reservation: returning 200 would mean re-reserving under a row the ledger says is closed, and 422 would claim a quota problem that does not exist. The code is in the single vocabulary (`nfr-design.md` §2.2) and tested in §12.3. Same shape of deviation as A2's `TENANT_ALREADY_EXISTS`, recorded here so neither is read as having been slipped in | If 200-replay were wanted instead, only `replayExistingLedgerRow` and one test change; no schema or API shape moves |
+| **A10** | `requirements.md` §11 DR-1 puts the Billing service **and** BR1–BR7 on the core owner, while the later-approved `units.md` §2 scopes U1 to Quota and Resource/Orchestrator only, leaving Billing to Karan (U2) | Followed `units.md`, the later approved document: U1 is two services, and **BR5 is reassigned to U2**, which is why §12.1 marks it out of scope rather than dropped. The fallback in `units.md` §5 still names Billing as Prajwal's to pick up if U2 stalls, so DR-1's intent survives as a contingency, not as U1 scope. Recorded because a reader of §12.1 alone could otherwise conclude BR5 had been lost | If U2 stalls and Prajwal takes Billing, it becomes a new unit of work (U1 does not grow): BR5, FR-26 to FR-31 and the WireMock-to-real swap all move together |
 
 ---
 
@@ -1212,12 +1344,14 @@ This stage is complete when approved. Specifically:
   (section 5), and the resource lifecycle is an explicit transition table plus diagram with
   defined illegal-transition behaviour (section 6).
 - The four algorithms carrying the challenges are specified precisely enough to implement from:
-  atomic reservation (7), exactly-once release (8), the idempotency decision table (9.2), the
-  saga forward path and compensation (9.5), plus termination (9.6).
+  atomic reservation (7) including the savepoint recovery both unique-constraint guards depend on
+  (7.2.1), exactly-once release (8), the idempotency decision table (9.2), the saga forward path
+  and compensation (9.5), plus termination (9.6).
 - The tier policy and BR8 enforcement point are fixed (10), and the rate constants U1 must pass
   to Billing are fixed (11).
-- BR1–BR8 and every FR owned by U1 trace to a class, a method and a named test, with other
-  units' rules marked out of scope (12).
+- BR1–BR8 and every FR owned by U1 trace to a class, a method, a named test **and an evidence
+  file** (DOC-4), with other units' rules marked out of scope, and the three error codes that
+  belong to no BR or FR given their own tests (12.1 to 12.3).
 - Each significant choice carries an alternatives-considered-and-rejected note, and every gap
   or contradiction found in the frozen inputs is recorded in section 13 rather than resolved
   silently.
