@@ -276,7 +276,10 @@ CREATE TABLE idempotency_records (
 
 COMMENT ON TABLE idempotency_records IS
   'BR2, BR3, Challenge 2. PK insert = concurrency guard; fingerprint compare = payload mismatch.
-   Retained 24h (requirements.md 6.2); swept by a scheduled job on expires_at.';
+   expires_at is written at insert as created_at + IDEMPOTENCY_RETENTION_HOURS (default 24,
+   requirements.md 6.2). Expiry is enforced by the scheduled sweep that deletes on this column,
+   not by a comparison on the read path, so a key is reusable 24h..24h+one sweep interval after
+   first use (functional-design.md 9.2, assumption A13).';
 
 -- Query pattern: the retention sweep deletes WHERE expires_at < now().
 CREATE INDEX ix_idempotency_expires_at ON idempotency_records (expires_at);
@@ -655,7 +658,21 @@ InOrder order = inOrder(/* journal-derived sequence */);                 // prov
 |--------|---------------|-----------------|
 | `scripts/challenge1-concurrency.ps1` | Default stubs; 20 parallel `POST /api/v1/resources` for `tnt-chal1-001`, each 4 CPU / 8 GB, a **distinct** `Idempotency-Key` per request so Challenge 2 does not mask Challenge 1 | 5 × 202, 15 × 422 `QUOTA_EXCEEDED`; `cpu_used = 20`; 5 `RESERVED` ledger rows (AC-1.2 to AC-1.4) |
 | `scripts/challenge2-idempotency.ps1` | Default stubs; 10 sequential repeats of one key, then **10 concurrent** repeats of a second key (AC-2.3 asks for ten, so the script fires ten — matching `IdempotencyConcurrencyIT`), then one reuse with an altered body | identical 202 bodies incl. the same `resourceId`; exactly 1 `resources` row and 1 `idempotency_records` row per key; 422 `IDEMPOTENCY_PAYLOAD_MISMATCH` on the altered body; one provider call in the journal (AC-2.1 to AC-2.4) |
-| `scripts/challenge3-saga.ps1` | **Forced-503 Billing stub** via `X-Simulate-Failure: billing:always-fail` | `resources.status = FAILED` with `failure_reason`; `provider_instance_id` cleared; `DELETE /provider/instances/...` then quota release in the journal; `tenant_quota` back to its pre-request values; `quota_reservations.state = RELEASED`; `saga.compensation.step order=1,2` log lines (AC-3.1 to AC-3.8) |
+| `scripts/challenge3-saga.ps1` | **Forced-503 Billing stub** via `X-Simulate-Failure: billing:always-fail` | `resources.status = FAILED` with `failure_reason` **prefixed `BILLING_UNAVAILABLE:`**; `provider_instance_id` cleared; `DELETE /provider/instances/{id}` then quota release in the journal, in that order; `tenant_quota` back to its pre-request values; `quota_reservations.state = RELEASED`; `saga.compensation.step order=1,2` log lines (AC-3.1 to AC-3.8) |
+
+**How far the saga got, now that the instance id is cleared.** `provider_instance_id IS NULL` on
+the FAILED row asserts AC-3.5 (nothing orphaned), but it no longer distinguishes a saga that
+failed *before* provisioning from one that failed *after* — the second case of
+`application-design.md` §8.4. The script therefore asserts the two surviving signals explicitly,
+and `evidence/challenge-3/` carries both:
+
+| Signal | Where the script reads it | What it proves |
+|--------|---------------------------|----------------|
+| `failure_reason` prefix | `db-after.txt` | `BILLING_UNAVAILABLE:` is reachable only with step 2 complete, so provisioning had succeeded and had to be undone. A step-2 failure would read `PROVIDER_UNAVAILABLE:` instead |
+| WireMock journal | `output.txt` | The `DELETE /api/v1/provider/instances/{id}` names the instance that existed and was terminated, i.e. the id the column no longer holds |
+
+Recorded as deviation **A11** in `functional-design.md` §13, so the reason the column is cleared
+and the replacement evidence are in one place.
 
 Each script captures command, output and a timestamp, plus the before/after `SELECT`s, into
 `evidence/challenge-<n>/` (ER-1 to ER-4). All three are re-runnable after `scripts/reset.ps1`.

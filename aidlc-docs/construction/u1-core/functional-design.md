@@ -315,6 +315,13 @@ Frozen in `application-design.md` section 5.2.
 | R6 | GET | `/api/v1/resources/expired` | Internal: ACTIVE resources past `expires_at` (FR-24 support) | 200 | — |
 | R7 | GET | `/health` | Liveness + DB connectivity | 200 | 503 |
 
+R1's list extends the three errors frozen in `application-design.md` §5.2 with 404
+`TENANT_NOT_FOUND`, 422 `TIER_FORBIDS_RESOURCE_TYPE` and 503 `DOWNSTREAM_UNAVAILABLE`. The first
+two are Quota's rejections propagated unchanged under the rule in `nfr-design.md` §2.4 — the
+orchestrator neither looks tenants up (§5.3) nor owns the tier policy (§10) — and the 503 is
+NFR-28's clean-failure answer when Quota cannot be reached. Recorded as deviation **A12** in
+section 13, in the same form as A2 and A9 on Quota's frozen lists.
+
 ### 4.1 R1 — Provision a resource
 
 **Headers**
@@ -395,7 +402,13 @@ Challenge 2 script can distinguish a replay from fresh processing without readin
 `instanceId` is **not** a column on `reservations`; it is read from the linked `resources` row
 (`provider_instance_id`) inside the same database. After a compensated saga it is `null`
 because the provider instance was terminated and the column cleared, which is the queryable
-evidence demanded by AC-3.5.
+evidence that nothing is left running (AC-3.5).
+
+Clearing the column is a **recorded deviation** from `application-design.md` §8.4, which reads a
+retained `provider_instance_id` on a FAILED row as the signal that compensation had to undo a
+completed provisioning step. That signal moves to `failure_reason`, and the deviation, its
+reason and its cost are set out in section 13, assumption **A11**. Nothing else in the frozen
+saga contract changes.
 
 ### 4.3 R3 / R4 — Read and list resources
 
@@ -504,7 +517,7 @@ the invariants. All instants are UTC (NFR-22).
 |---------|------|----------------------|
 | `Resource` | entity (`resources`) | `status` is one of five values. `ACTIVE` ⇒ `activated_at` set. `FAILED` ⇒ `failure_reason` set. `TERMINATED` ⇒ `terminated_at` set. Transitions only along section 6's graph (BR4) |
 | `Reservation` | entity (`reservations`) | One row per provisioning request. At most one row per `resource_id` (`UNIQUE`). `PENDING` is non-terminal; `COMPLETED` and `FAILED` are terminal. `FAILED` ⇒ `failure_reason` set. Holds the persisted `X-Simulate-Failure` directive (FR-46). `created_at` and `updated_at` are equal at insert; **`updated_at` is maintained by `ReservationService`**, which writes `clock.instant()` into it in the same statement as every status change — PostgreSQL's `DEFAULT now()` covers the insert only and no trigger exists (see section 9.5) |
-| `IdempotencyRecord` | entity (`idempotency_records`) | PK is the client's key — the uniqueness guard for BR2/BR3. `request_fingerprint` is a 64-char SHA-256 hex. `COMPLETED` ⇒ `response_status` and `response_body` set. `expires_at = created_at + 24h` |
+| `IdempotencyRecord` | entity (`idempotency_records`) | PK is the client's key — the uniqueness guard for BR2/BR3. `request_fingerprint` is a 64-char SHA-256 hex. `COMPLETED` ⇒ `response_status` and `response_body` set. `expires_at = created_at + idempotency.retention-hours` (`IDEMPOTENCY_RETENTION_HOURS`, default 24), computed at insert from configuration so the row's horizon and the sweep's predicate always agree (§9.2) |
 | `ResourceStatus` | enum | `REQUESTED`, `PROVISIONING`, `ACTIVE`, `FAILED`, `TERMINATED` |
 | `ReservationStatus` | enum | `PENDING`, `COMPLETED`, `FAILED` |
 | `ResourceLifecycle` | domain rule | BR4: the explicit transition table, implemented as data and not inferred from field values (FR-50) |
@@ -542,7 +555,7 @@ illegal transition is a missing key. Nothing is inferred from timestamps or from
 | `PROVISIONING` | `INSTANCE_CREATED` | `PROVISIONING` | Self-transition: sets `provider_instance_id`. Explicit so the saga's progress is queryable (AC-3.1) | `ProvisioningSaga` step 2 |
 | `PROVISIONING` | `ACTIVATED` | `ACTIVE` | Sets `activated_at`. **Only path to ACTIVE** (BR4) | `ProvisioningSaga` step 4 |
 | `REQUESTED` | `SAGA_FAILED` | `FAILED` | Sets `failure_reason`; compensation has already run | `ProvisioningSaga.compensate` |
-| `PROVISIONING` | `SAGA_FAILED` | `FAILED` | Sets `failure_reason`; clears `provider_instance_id` after the provider instance is terminated | `ProvisioningSaga.compensate` |
+| `PROVISIONING` | `SAGA_FAILED` | `FAILED` | Sets `failure_reason`; clears `provider_instance_id` after the provider instance is terminated (deviation **A11**: `failure_reason`, not a retained instance id, is the "how far did the saga get" signal) | `ProvisioningSaga.compensate` |
 | `ACTIVE` | `TERMINATE_REQUESTED` | `TERMINATED` | Sets `terminated_at`. Applied by a conditional UPDATE guarded on `status = 'ACTIVE'` (BR7 gate) | `TerminationService` |
 | `TERMINATED` | `TERMINATE_REQUESTED` | `TERMINATED` | **Absorbing**: no effect, no downstream calls, 202 `alreadyTerminated: true` (FR-21) | `TerminationService` |
 | any other pair | — | — | `IllegalStateTransitionException` | `ResourceLifecycle.transition` |
@@ -888,9 +901,9 @@ typo.
 | 2 | Bean Validation fails on the body | **400 `VALIDATION_FAILED`**. No record written |
 | 3 | PK insert of `(key, fingerprint, IN_PROGRESS)` **succeeds** | Process the request (section 9.3) |
 | 4 | Insert fails, stored fingerprint **differs** | **422 `IDEMPOTENCY_PAYLOAD_MISMATCH`**, naming the key. No effect |
-| 5 | Insert fails, fingerprint matches, record `COMPLETED` | Return the **stored status and body verbatim** + `Idempotency-Replayed: true`. No reprocessing: no second quota reservation, no second provider call, no second meter (AC-2.1, AC-2.2) |
+| 5 | Insert fails, fingerprint matches, record `COMPLETED` | Return the **stored status and body verbatim** + `Idempotency-Replayed: true`. No reprocessing: no second quota reservation, no second provider call, no second meter (AC-2.1, AC-2.2). Verbatim is absolute — see "What a replay does *not* re-stamp" below |
 | 6 | Insert fails, fingerprint matches, record `IN_PROGRESS` | **202** pointing at the **same** `reservationId` held on the record |
-| 7 | Record older than 24 h | Treated as absent; a sweep deletes expired rows, and the insert in step 3 succeeds again |
+| 7 | Record past `expires_at` | Still authoritative, and still decided by steps 4–6, until the retention sweep deletes the row. The sweep is what enforces expiry; see "When a key actually becomes reusable" below |
 
 ```java
 // com.crm.resource.domain.service.IdempotencyService
@@ -898,9 +911,14 @@ IdempotencyDecision beginOrReplay(String key, String fingerprint, UUID candidate
 
     // The PK insert is the guard. It runs inside a SAVEPOINT (§7.2.1) so that after a
     // duplicate-key violation this transaction is still live and the stored record can be read.
+    Instant now = clock.instant();
     IdempotencyDecision duplicate = savepointGuard.insertOrRecover(
+            // expires_at = now + idempotency.retention-hours (IDEMPOTENCY_RETENTION_HOURS,
+            // default 24). The configured value is read here, never hard-coded, so the record's
+            // own horizon and what the sweep deletes can never disagree.
             () -> repository.saveAndFlush(IdempotencyRecord.inProgress(
-                      key, fingerprint, candidateReservationId, clock.instant(), /* +24h */)),
+                      key, fingerprint, candidateReservationId,
+                      now, now.plus(retentionHours, ChronoUnit.HOURS))),
             () -> decideFromStoredRecord(key, fingerprint));
 
     return duplicate != null ? duplicate : IdempotencyDecision.proceed();   // step 3
@@ -945,6 +963,47 @@ has a reservation to point at. With the single-transaction design above it is ra
 in practice (the loser usually observes `COMPLETED` after blocking); it is proven by a test
 that inserts an `IN_PROGRESS` row directly, which is also what would be observed if the record
 were ever committed early by a future refactor.
+
+**When a key actually becomes reusable.** `decideFromStoredRecord` deliberately does **not**
+read `expires_at`: a stored record decides the request as long as the row exists. Expiry is
+therefore enforced by deletion, not by comparison — the `@Scheduled` retention sweep
+(`nfr-design.md` §9, D5) deletes rows past `expires_at` every `IDEMPOTENCY_SWEEP_INTERVAL_MS`
+(one hour by default), and only after that deletion does the step-3 insert succeed again for the
+same key. The honest bound is therefore **between `IDEMPOTENCY_RETENTION_HOURS` and
+`IDEMPOTENCY_RETENTION_HOURS` + one sweep interval** after first use — 24 to 25 hours on the
+defaults — not exactly 24 hours.
+
+That is the right trade-off here, and stating it is cheaper than removing it. Checking
+`expires_at` on the recovery path would mean a delete-then-insert inside the savepoint recovery,
+which is a second write on the contended concurrent path for a case no test and no challenge
+script ever reaches (every script finishes in seconds). The frozen requirement is a *retention*
+guarantee — records are kept 24 h (`requirements.md` §6.2, `application-design.md` §7 step 6) —
+and keeping a record slightly longer than its horizon honours that; it never shortens it. The
+only observable consequence is that a client reusing a key in the 24–25 h window gets its
+original answer back instead of fresh processing, which is the safe direction for an idempotency
+guard to fail.
+
+**What a replay does *not* re-stamp.** Step 5 returns the stored status and body **byte for
+byte**, and that rule wins over `nfr-design.md` §2.4's "`correlationId` is local, `timestamp` is
+re-stamped" whenever the two collide. They collide on exactly one path: a key that owns a stored
+**error** body (the quota-rejection path of section 9.3 step (b)), whose problem document already
+carries the first caller's `correlationId` and `timestamp`. A replay returns those original
+values unchanged.
+
+- **Why verbatim wins.** AC-2.1 asks for a response *identical* to the first, and the Challenge 2
+  script asserts that by comparing the two bodies. Rewriting two members would make a replay
+  detectably different from the response it is replaying, which is the one property the criterion
+  is about. §2.4's rule exists to stop a *peer* blanking the field while a body is being
+  constructed; a replay constructs nothing.
+- **How the replay is still traceable.** The replaying request's own correlation ID is not lost:
+  it is on the `Idempotency-Replayed: true` response, in the `idempotency.replay` log line
+  (`nfr-design.md` §4.5), and in the access log. So the trace reads "correlation X replayed the
+  answer first produced under correlation Y", which is more informative than overwriting Y.
+- **Content type.** The replay bypasses `ProblemDetailsFactory`, so the controller sets the type
+  from the stored status rather than inheriting a default: `application/problem+json` when
+  `response_status >= 400`, `application/json` otherwise. No extra column is needed — the status
+  is already stored, and U1 emits exactly these two media types. Asserted by
+  `IdempotencyReplayTest.replayedRejectionKeepsProblemJsonAndOriginalCorrelationId`.
 
 **Alternatives considered and rejected.**
 
@@ -1013,8 +1072,10 @@ Three deliberate details:
   inserted on another connection.
 - **A business rejection commits; an infrastructure failure rolls back.** A 422
   `QUOTA_EXCEEDED` is a *final answer* about this payload, so it is stored against the key and
-  replayed identically. A 503 from an unreachable Quota is not an answer at all, so the key is
-  released and the client may retry (see section 13, assumption A3).
+  replayed identically — verbatim, including the original `correlationId` and `timestamp`, with
+  `application/problem+json` as the content type, per the replay rule in section 9.2. A 503 from
+  an unreachable Quota is not an answer at all, so the key is released and the client may retry
+  (see section 13, assumption A3).
 - **The idempotency record is written before the reservation row exists, and that is why
   `idempotency_records.reservation_id` carries no foreign key.** Step (a) mints
   `reservationId` and stores it on the record; the `reservations` row is only inserted at step
@@ -1094,7 +1155,7 @@ private void compensate(ProvisioningTask task, String instanceId, boolean meterS
     // (2) Undo step 2. Idempotent on instance id; a 404 is success, not a failure.
     if (instanceId != null) {
         quietly(() -> providerClient.terminate(instanceId), "compensate.provider");
-        lifecycle.clearInstanceId(task.resourceId());
+        lifecycle.clearInstanceId(task.resourceId());   // deviation A11: see §13
     }
     // (3) Undo step 1 — the quota reservation taken synchronously before the 202 (BR6, AC-3.4).
     //     Exactly-once by the ledger's UNIQUE(resource_id) + state flip (BR7).
@@ -1124,6 +1185,20 @@ a stopped-meter call could race a terminated instance and leave an open meter), 
 released last because it is the only step whose undo is a *promise to the tenant* — releasing
 it first would let another request consume the capacity while this resource's instance is still
 alive.
+
+**Why step (2) clears `provider_instance_id`, and what that costs.** The column is the one place
+a reader can look to ask "is there still an instance out there?", and after a successful
+`providerClient.terminate` the honest answer is no — so leaving the id in place would assert the
+opposite of the state the compensation just achieved, and AC-3.5 ("no orphaned data remains") is
+read straight off that column in `infrastructure-design.md` §7.3. The cost is that
+`application-design.md` §8.4's second evidence case — a FAILED row that *keeps* its
+`provider_instance_id`, meaning compensation had to undo a completed provisioning step — can no
+longer be observed in that column. That signal is carried instead by `failure_reason`, whose
+prefix names the step that broke (`BILLING_UNAVAILABLE: ...` can only be reached with step 2
+already complete, `PROVIDER_UNAVAILABLE: ...` only with step 2 incomplete), and corroborated by
+the WireMock request journal, which shows the `DELETE /api/v1/provider/instances/{id}` that
+carried the now-erased id. Both are asserted by the Challenge 3C script. Recorded as deviation
+**A11** in section 13 because it is a reading of a frozen document, not a free choice.
 
 **Why `quietly`.** Each compensating call is wrapped so that a failure is logged and the
 remaining compensations still run. A compensation that aborts half-way is worse than one that
@@ -1260,7 +1335,7 @@ scripts write in `infrastructure-design.md` §7.3.
 | Rule | Owner | Class and method that enforces it | Test class and method | Test kind | Evidence file |
 |------|-------|-----------------------------------|----------------------|-----------|---------------|
 | **BR1** quota never exceeds tier limits under any concurrency | Quota (U1) | `TenantQuotaRepository.reserveIfWithinLimits` (the atomic conditional UPDATE), called by `QuotaService.reserve` | `QuotaReservationAtomicityIT.exactlyNConcurrentReservationsSucceed` | Testcontainers (TR-3, TR-4) | `evidence/challenge-1/output.txt` (5 × 202, 15 × 422), `evidence/challenge-1/db-after.txt` (`cpu_used = 20`, 5 `RESERVED` rows), `evidence/challenge-1/explanation.md` |
-| **BR2** provisioning is idempotent | Orchestrator (U1) | `IdempotencyService.beginOrReplay` + `ProvisioningService.provision` | `IdempotencyServiceTest.replayReturnsStoredResponseWithoutReprocessing`; `IdempotencyConcurrencyIT.tenConcurrentDuplicatesCreateOneResource` | Unit + Testcontainers (TR-5) | `evidence/challenge-2/output.txt` (identical bodies, same `resourceId`), `evidence/challenge-2/db-after.txt` (one row per key), `evidence/challenge-2/replay-logs.txt` |
+| **BR2** provisioning is idempotent | Orchestrator (U1) | `IdempotencyService.beginOrReplay` + `ProvisioningService.provision` | `IdempotencyServiceTest.replayReturnsStoredResponseWithoutReprocessing`; `IdempotencyReplayTest.replayedRejectionKeepsProblemJsonAndOriginalCorrelationId` (the verbatim rule of §9.2); `IdempotencyConcurrencyIT.tenConcurrentDuplicatesCreateOneResource` | Unit + Testcontainers (TR-5) | `evidence/challenge-2/output.txt` (identical bodies, same `resourceId`), `evidence/challenge-2/db-after.txt` (one row per key), `evidence/challenge-2/replay-logs.txt` |
 | **BR3** reused key with a different payload is rejected | Orchestrator (U1) | `IdempotencyService.beginOrReplay` → `decideFromStoredRecord` (fingerprint compare after the savepoint rollback, §7.2.1) + `RequestFingerprint.of` | `RequestFingerprintTest.differentPayloadsDifferentFingerprints`; `IdempotencyPayloadMismatchIT.reusedKeyAlteredPayloadReturns422` | Unit + Testcontainers (TR-3) | `evidence/challenge-2/output.txt` (the 422 case), `evidence/challenge-2/db-after.txt` (first record unchanged) |
 | **BR4** only the defined lifecycle transitions occur; ACTIVE only from PROVISIONING | Orchestrator (U1) | `ResourceLifecycle.transition` / `.canTransition` | `ResourceLifecycleTest.activeOnlyReachableFromProvisioning`; `.illegalTransitionIsRejected` | Unit (TR-2) | `evidence/unit-tests/u1-test-report.txt`; the 409 body in `evidence/e2e/e2e-output.txt` |
 | **BR5** billing meter stops on termination and accrues nothing after | **Billing (U2) — out of scope for U1** | U1 only calls `BillingClient.stopMeter` from `TerminationService` teardown | U1 asserts the call was made: `TerminationTeardownTest.stopsMeterOnTermination` (WireMock). The rule itself is Karan's `BillingMeterTest` | Out of scope for U1 | U1 contributes only the stop-meter journal line in `evidence/e2e/e2e-output.txt`; the rule's own evidence belongs to U2 |
@@ -1330,6 +1405,9 @@ Recorded rather than silently resolved, as required. None blocks Code Generation
 | **A8** | §5.2's list filter is written `?tenantId=&status=` without saying which is required | `tenantId` required, `status` optional. A cross-tenant listing has no caller and would be an accidental data-exposure endpoint | U4's aggregator already sends both |
 | **A9** | `application-design.md` §5.1 freezes Q4's errors as "422 insufficient, 422 BR8 cluster on FREE, 404 tenant", with no answer for a reserve against a `resourceId` whose ledger row is already `RELEASED` | Added **409 `QUOTA_RESERVATION_ALREADY_RELEASED`** (§3.3, §7.2). Reserving again for a resource whose quota has already been given back is a state conflict, not a fresh reservation: returning 200 would mean re-reserving under a row the ledger says is closed, and 422 would claim a quota problem that does not exist. The code is in the single vocabulary (`nfr-design.md` §2.2) and tested in §12.3. Same shape of deviation as A2's `TENANT_ALREADY_EXISTS`, recorded here so neither is read as having been slipped in | If 200-replay were wanted instead, only `replayExistingLedgerRow` and one test change; no schema or API shape moves |
 | **A10** | `requirements.md` §11 DR-1 puts the Billing service **and** BR1–BR7 on the core owner, while the later-approved `units.md` §2 scopes U1 to Quota and Resource/Orchestrator only, leaving Billing to Karan (U2) | Followed `units.md`, the later approved document: U1 is two services, and **BR5 is reassigned to U2**, which is why §12.1 marks it out of scope rather than dropped. The fallback in `units.md` §5 still names Billing as Prajwal's to pick up if U2 stalls, so DR-1's intent survives as a contingency, not as U1 scope. Recorded because a reader of §12.1 alone could otherwise conclude BR5 had been lost | If U2 stalls and Prajwal takes Billing, it becomes a new unit of work (U1 does not grow): BR5, FR-26 to FR-31 and the WireMock-to-real swap all move together |
+| **A11** | `application-design.md` §8.4 (frozen by its own §12) states that "a FAILED resource with a `provider_instance_id` means compensation had to undo a completed provisioning step", but §8's own compensation requires terminating that instance, after which keeping the id asserts something untrue | Compensation **clears** `provider_instance_id` (§6.1, §9.5 step (2)), so AC-3.5's "no orphaned data" reads directly off the column and §7.3's assertion is a null check. §8.4's second case is therefore unobservable **in that column**; the "how far did the saga get" signal moves to `failure_reason`, whose prefix distinguishes a step-2 failure (`PROVIDER_UNAVAILABLE: ...`, no instance was ever created) from a step-3 failure (`BILLING_UNAVAILABLE: ...`, an instance existed and was terminated), and is corroborated by the WireMock journal's `DELETE /api/v1/provider/instances/{id}`. Both are asserted by the Challenge 3C script (`infrastructure-design.md` §7.3). Recorded because it is a deviation from a frozen document, not a free choice | If the retained id is wanted as the evidence instead, revert `lifecycle.clearInstanceId` in §9.5 step (2) and flip §7.3's assertion from "cleared" to "retained, instance TERMINATED in the journal". R2 would then report an `instanceId` for a destroyed instance, which is why it is not the default |
+| **A12** | `application-design.md` §5.2 freezes R1's error list as "400 missing key, 422 quota, 422 payload-mismatch on key reuse", with no entry for a peer rejection or an unreachable peer, although §7 and NFR-28 both require R1 to have an answer for them | R1 additionally emits **404 `TENANT_NOT_FOUND`**, **422 `TIER_FORBIDS_RESOURCE_TYPE`** and **503 `DOWNSTREAM_UNAVAILABLE`** (§4). The first two are not new rules: the orchestrator does not look tenants up (§5.3) and does not own the tier policy (§10), so Quota's rejection is propagated under the rule in `nfr-design.md` §2.4, extension members included. The 503 is NFR-28's clean-failure answer when Quota is unreachable after retries. All three are in the single vocabulary table (`nfr-design.md` §2.2) and marked propagated there. Recorded for the same reason as A2 and A9, which extend Quota's frozen lists: an extension that is only visible by diffing two documents is an extension that was slipped in | None behavioural — removing them would mean R1 answering a tenant-not-found with a 500. If the frozen list must be literal, the only alternative is a pre-flight tenant lookup, which costs a second round trip and gives tenant existence two authorities |
+| **A13** | `application-design.md` §7 step 6 and `requirements.md` §6.2 fix 24-hour retention but say nothing about *when* a key becomes reusable, and nothing about who evaluates `expires_at` | Retention is enforced by **deletion, not comparison**: the recovery path never reads `expires_at`, and the hourly `@Scheduled` sweep (`nfr-design.md` §9, D5) removes expired rows, so a key is reusable between `IDEMPOTENCY_RETENTION_HOURS` and that plus one sweep interval after first use (24–25 h on the defaults). Stated in §9.2 rather than rounded to "24 h". The horizon itself is computed at insert from the configured value, so the row and the sweep cannot disagree | If an exact 24-hour bound is required, `decideFromStoredRecord` deletes an expired record and lets the caller proceed — one extra write on the concurrent path, for a case no test or script reaches |
 
 ---
 

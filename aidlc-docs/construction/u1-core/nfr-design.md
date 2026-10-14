@@ -285,6 +285,33 @@ unparseable peer body — is translated to `DOWNSTREAM_UNAVAILABLE` with the pee
 `QUOTA_EXCEEDED` with `exhausted: ["CPU"]` must produce an orchestrator 422 whose body still
 carries `exhausted: ["CPU"]`, with `instance = /api/v1/resources`.
 
+### 2.5 The one exception: a replayed idempotent response
+
+§2.4's rule that `correlationId` comes from the local MDC and `timestamp` is re-stamped applies
+**when a problem body is being constructed**. A replayed idempotent response is not constructed;
+it is *returned*. `functional-design.md` §9.2 step 5 stores the response against the key and
+replays the **stored status and body byte for byte**, and on the one path where the stored body
+is itself a problem document — a key that owns a 422 `QUOTA_EXCEEDED` or
+`TIER_FORBIDS_RESOURCE_TYPE` from the synchronous quota call — the two rules collide.
+
+> **Verbatim wins.** A replay carries the *original* `correlationId` and `timestamp`, not the
+> replaying request's. This is a deliberate, single exception to §2.4.
+
+| Aspect | Rule on a replay | Why |
+|--------|------------------|-----|
+| `correlationId`, `timestamp` in the stored body | **unchanged**, as first written | AC-2.1 requires a response identical to the first, and the Challenge 2 script asserts it by comparing bodies. Re-stamping two members would make the replay detectably different from what it replays. §2.4 exists to stop an unreliable *peer* blanking the field during construction, which is not what is happening here |
+| Status | the stored `response_status` | Same reason |
+| Content type | derived from the stored status: `application/problem+json` when `response_status >= 400`, `application/json` otherwise | The replay bypasses `ProblemDetailsFactory`, so the controller must set it. No extra column: the status is already stored, and U1 emits only these two media types |
+| `Idempotency-Replayed: true` response header | always present on a replay | This is where the *replaying* request's identity surfaces (AC-2.5), together with the `idempotency.replay` log line (§4.5), which carries the current correlation ID and the key. The trace therefore reads "correlation X replayed the answer first produced under correlation Y" — strictly more information than overwriting Y |
+
+`IdempotencyReplayTest.replayedRejectionKeepsProblemJsonAndOriginalCorrelationId` is the test
+that pins both halves: the media type and the untouched `correlationId`.
+
+**Alternative rejected:** rewriting `correlationId` and `timestamp` on replay to keep §2.4
+absolute. It would satisfy a cross-cutting convention by breaking an acceptance criterion the
+unit is graded on, and it would leave the replayed body neither the original nor a freshly
+reasoned one.
+
 ---
 
 ## 3. Correlation ID (NFR-13, NFR-14, NFR-16)
@@ -504,6 +531,20 @@ The `order=1 … order=2` fields are what AC-3.3 ("compensation executes in reve
 asserted against — the script greps `saga.compensation.step` and checks the sequence, rather
 than a human reading timestamps.
 
+Replay path (Challenge 2, AC-2.5 — a replay is distinguishable from fresh processing without
+reading the database, and the stored body's own correlation ID is named rather than overwritten,
+per §2.5):
+
+```json
+{"@timestamp":"2026-10-14T09:13:40.002Z","level":"INFO","service":"resource","correlationId":"44aa55bb","logger":"c.c.r.a.ResourceController","message":"provision.received idempotencyKey=0f8c…001 fingerprint=9f2c1a…"}
+{"@timestamp":"2026-10-14T09:13:40.011Z","level":"WARN","service":"resource","correlationId":"44aa55bb","logger":"c.c.r.d.s.IdempotencyService","message":"idempotency.replay idempotencyKey=0f8c…001 outcome=REPLAYED storedStatus=202 originCorrelationId=b1c2d3e4 reprocessed=false"}
+```
+
+`reprocessed=false` is the AC-2.2 assertion in log form, and `originCorrelationId` is what keeps
+the replay traceable to the exchange that produced the stored body — no peer call, no quota
+reservation and no state change appears between these two lines, which is the point. The body
+itself is never logged, only its status (NFR-17, §4.4).
+
 ---
 
 ## 5. Configuration (NFR-18, NFR-19, NFR-20)
@@ -619,7 +660,7 @@ Property key ↔ environment variable mapping, in full:
 | `peers.notification.*` | `NOTIFICATION_SERVICE_URL`, `NOTIFICATION_CONNECT_TIMEOUT_MS`, `NOTIFICATION_READ_TIMEOUT_MS` | `NotificationClient` |
 | `retry.*` | `RETRY_MAX_ATTEMPTS`, `RETRY_INITIAL_BACKOFF_MS`, `RETRY_MULTIPLIER`, `RETRY_MAX_BACKOFF_MS`, `RETRY_JITTER_RATIO` | the shared retry policy (§8.2) |
 | `saga.pool.core` / `.max` / `.queue` | `SAGA_POOL_CORE`, `SAGA_POOL_MAX`, `SAGA_POOL_QUEUE` | `AsyncConfig.sagaExecutor` (§3.3) |
-| `idempotency.retention-hours` / `.sweep-interval-ms` | `IDEMPOTENCY_RETENTION_HOURS`, `IDEMPOTENCY_SWEEP_INTERVAL_MS` | `IdempotencyService`, the sweep job (D5) |
+| `idempotency.retention-hours` / `.sweep-interval-ms` | `IDEMPOTENCY_RETENTION_HOURS`, `IDEMPOTENCY_SWEEP_INTERVAL_MS` | `IdempotencyService` computes `expires_at = created_at + retention-hours` at insert; the sweep job deletes on it (D5) |
 | `billing.rate-per-cpu-hour` | `BILLING_RATE_PER_CPU_HOUR` | `ProvisioningSaga` → `BillingClient` (FR-28) |
 
 Spring's relaxed binding means the environment variable and the property key never have to be
@@ -666,8 +707,8 @@ without the test knowing anything about environment variables.
 | `RETRY_JITTER_RATIO` | NFR-26 jitter, ±50 % of the computed delay | `0.5` | optional |
 | `BILLING_RATE_PER_CPU_HOUR` | the rate sent to Billing (FR-28) | `0.12` | optional |
 | `SAGA_POOL_CORE` / `SAGA_POOL_MAX` / `SAGA_POOL_QUEUE` | background saga executor | `4` / `8` / `100` | optional |
-| `IDEMPOTENCY_RETENTION_HOURS` | record retention (Challenge 2) | `24` | optional |
-| `IDEMPOTENCY_SWEEP_INTERVAL_MS` | expired-record sweep period | `3600000` | optional |
+| `IDEMPOTENCY_RETENTION_HOURS` | record retention (Challenge 2); written into each record's `expires_at` at insert | `24` | optional |
+| `IDEMPOTENCY_SWEEP_INTERVAL_MS` | expired-record sweep period; also the slack on when a key becomes reusable (D5) | `3600000` | optional |
 
 ### 5.4 Why no code change is needed between local and Docker (NFR-20)
 
@@ -914,7 +955,8 @@ property a breaker is meant to protect.
 | **D2** | NFR-15 requires `service` on every line, but Spring Boot's ECS format emits `service.name` from `spring.application.name` | Treated as satisfied: the field is present and carries the service name. A reader asserting the literal key `service` should read `service.name` — noted so the Build and Test stage asserts the right key |
 | **D3** | `units.md` §9's grant script is insufficient on PostgreSQL 15+ | Corrected in §6.1 and in `infrastructure-design.md` §3, with the reason stated. The inception document itself is **not** edited (it is approved and frozen); the correction lives here |
 | **D4** | Nothing in the frozen inputs fixes the saga executor's size or queue depth | `SAGA_POOL_CORE=4`, `SAGA_POOL_MAX=8`, `SAGA_POOL_QUEUE=100`, all configurable. Enough for 20 parallel Challenge 1 requests, of which at most 5 proceed to a saga |
-| **D5** | `requirements.md` §5.4 does not say who deletes expired idempotency records | A `@Scheduled` sweep on the orchestrator, hourly by default (`IDEMPOTENCY_SWEEP_INTERVAL_MS`), deleting rows past `expires_at`. It is a housekeeping job, not business state, so it needs no coordination; a double run is harmless |
+| **D5** | `requirements.md` §5.4 does not say who deletes expired idempotency records | A `@Scheduled` sweep on the orchestrator, hourly by default (`IDEMPOTENCY_SWEEP_INTERVAL_MS`), deleting rows past `expires_at`. It is a housekeeping job, not business state, so it needs no coordination; a double run is harmless. **This sweep is also what enforces expiry**: the idempotency recovery path never compares `expires_at`, so a key becomes reusable between `IDEMPOTENCY_RETENTION_HOURS` and that plus one sweep interval after first use — 24 to 25 hours on the defaults. Stated rather than rounded; see `functional-design.md` §9.2 and assumption A13 there. `expires_at` itself is computed at insert from `idempotency.retention-hours`, so changing the variable moves the record's horizon and the sweep's predicate together |
+| **D6** | `application-design.md` §5.7 and §7 do not say whether the three mandatory extension members are re-stamped when a stored idempotent response is replayed | Verbatim replay wins over §2.4 for stored bodies, and the content type is derived from the stored status. Specified as the single documented exception in §2.5, because AC-2.1 compares the two bodies directly |
 
 ---
 
@@ -928,7 +970,8 @@ This stage is complete when approved. Specifically:
   construction point for problem bodies, the **complete** `code` → status → meaning → emitting
   service vocabulary, a worked example body per error class, and the propagation rule that
   carries a peer's extension members (`exhausted[]`) through the orchestrator so AC-1.3 holds
-  where the Challenge 1 script actually reads it (section 2, including §2.4).
+  where the Challenge 1 script actually reads it (section 2, including §2.4), with the single
+  documented exception for a verbatim idempotent replay and its content type (§2.5).
 - Correlation-ID handling is specified inbound, outbound and **across the async boundary**, with
   both the MDC task decorator and the task-payload field, and with the reason both exist
   (section 3).
