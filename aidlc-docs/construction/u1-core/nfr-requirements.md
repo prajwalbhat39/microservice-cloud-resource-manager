@@ -1,7 +1,7 @@
 # NFR Requirements — Unit U1 (Core Challenge Services)
 
 **Stage**: CONSTRUCTION / NFR Requirements
-**Status**: Awaiting approval
+**Status**: APPROVED (2026-10-14)
 **Unit**: U1 — Core Challenge Services
 **Owner**: Prajwal (core owner)
 **Services in scope**: Quota (`:8081`, `quota_db`), Resource / Orchestrator (`:8082`, `resource_db`)

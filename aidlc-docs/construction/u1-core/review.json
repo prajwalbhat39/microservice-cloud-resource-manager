@@ -1,0 +1,24 @@
+{
+  "verdict": "APPROVED",
+  "findings": [
+    {
+      "id": 1,
+      "severity": "non-blocking",
+      "confidence": "confirmed",
+      "label": "Transition table and saga disagree on who clears provider_instance_id",
+      "location": "functional-design.md §6.1 (PROVISIONING + SAGA_FAILED row) vs §9.5 compensate step (2)",
+      "issue": "§6.1 lists 'clears provider_instance_id' as the side effect of the SAGA_FAILED transition, but §9.5 clears it in compensation step (2) via lifecycle.clearInstanceId, two steps before SAGA_FAILED is applied in step (4). clearInstanceId is therefore a ResourceLifecycle mutator that is not an event on the graph, and the column is cleared while the row is still PROVISIONING — so a crash in that window leaves a PROVISIONING row whose null id the §7.3 evidence rule would read as 'step 2 never completed'.",
+      "action": "Keep the §9.5 ordering (clearing only after the terminate call returns is what makes the null honest) and either fold the clear into the SAGA_FAILED side effect, or reword the §6.1 cell to name compensation step (2) as the writer."
+    },
+    {
+      "id": 2,
+      "severity": "non-blocking",
+      "confidence": "confirmed",
+      "label": "failure_reason prefix vocabulary incomplete for non-peer failures",
+      "location": "functional-design.md §13 A11, §9.5 (FailureReason.of), §6.3 path 2; infrastructure-design.md §7.3 and the resources.failure_reason column comment",
+      "issue": "A11 moves the 'how far did the saga get' signal from the retained provider_instance_id to the failure_reason prefix, and §7.3 asserts on it, but only PROVIDER_UNAVAILABLE: and BILLING_UNAVAILABLE: are defined. §6.3's saga-driven illegal transition — and a failure in step 4's ACTIVATED transition or reservationService.complete — reaches FAILED with neither prefix, so on that path the cleared column and the prefix both fail to say whether provisioning had completed; only the WireMock journal does.",
+      "action": "Specify what FailureReason.of emits for a non-peer failure (INTERNAL_ERROR: matches the code already in nfr-design.md §2.2) and state that the WireMock journal is the surviving signal in that case."
+    }
+  ],
+  "reviewDoc": "c:\\Users\\USER\\OneDrive\\Documents\\microservice-cloud-resource-manager\\aidlc-docs\\construction\\u1-core/review.md"
+}

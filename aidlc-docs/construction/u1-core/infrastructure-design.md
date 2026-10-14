@@ -1,7 +1,7 @@
 # Infrastructure Design — Unit U1 (Core Challenge Services)
 
 **Stage**: CONSTRUCTION / Infrastructure Design
-**Status**: Awaiting approval
+**Status**: APPROVED (2026-10-14)
 **Unit**: U1 — Core Challenge Services
 **Owner**: Prajwal (core owner)
 **Services in scope**: Quota (`:8081`, `quota_db`, `quota_user`), Resource / Orchestrator (`:8082`, `resource_db`, `resource_user`)

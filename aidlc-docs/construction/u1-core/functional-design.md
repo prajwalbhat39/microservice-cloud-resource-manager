@@ -1,7 +1,7 @@
 # Functional Design — Unit U1 (Core Challenge Services)
 
 **Stage**: CONSTRUCTION / Functional Design
-**Status**: Awaiting approval
+**Status**: APPROVED (2026-10-14)
 **Unit**: U1 — Core Challenge Services
 **Owner**: Prajwal (core owner)
 **Services in scope**: Quota (`:8081`, `quota_db`), Resource / Orchestrator (`:8082`, `resource_db`)
@@ -555,7 +555,7 @@ illegal transition is a missing key. Nothing is inferred from timestamps or from
 | `PROVISIONING` | `INSTANCE_CREATED` | `PROVISIONING` | Self-transition: sets `provider_instance_id`. Explicit so the saga's progress is queryable (AC-3.1) | `ProvisioningSaga` step 2 |
 | `PROVISIONING` | `ACTIVATED` | `ACTIVE` | Sets `activated_at`. **Only path to ACTIVE** (BR4) | `ProvisioningSaga` step 4 |
 | `REQUESTED` | `SAGA_FAILED` | `FAILED` | Sets `failure_reason`; compensation has already run | `ProvisioningSaga.compensate` |
-| `PROVISIONING` | `SAGA_FAILED` | `FAILED` | Sets `failure_reason`; clears `provider_instance_id` after the provider instance is terminated (deviation **A11**: `failure_reason`, not a retained instance id, is the "how far did the saga get" signal) | `ProvisioningSaga.compensate` |
+| `PROVISIONING` | `SAGA_FAILED` | `FAILED` | Sets `failure_reason`. Does **not** itself touch `provider_instance_id`: compensation step (2) in §9.5 clears it through `lifecycle.clearInstanceId` immediately after terminating the instance, so the column is already `null` by the time this transition runs (deviation **A11**: `failure_reason`, not a retained instance id, is the "how far did the saga get" signal) | `ProvisioningSaga.compensate` |
 | `ACTIVE` | `TERMINATE_REQUESTED` | `TERMINATED` | Sets `terminated_at`. Applied by a conditional UPDATE guarded on `status = 'ACTIVE'` (BR7 gate) | `TerminationService` |
 | `TERMINATED` | `TERMINATE_REQUESTED` | `TERMINATED` | **Absorbing**: no effect, no downstream calls, 202 `alreadyTerminated: true` (FR-21) | `TerminationService` |
 | any other pair | — | — | `IllegalStateTransitionException` | `ResourceLifecycle.transition` |
@@ -1199,6 +1199,28 @@ already complete, `PROVIDER_UNAVAILABLE: ...` only with step 2 incomplete), and 
 the WireMock request journal, which shows the `DELETE /api/v1/provider/instances/{id}` that
 carried the now-erased id. Both are asserted by the Challenge 3C script. Recorded as deviation
 **A11** in section 13 because it is a reading of a frozen document, not a free choice.
+
+**What `FailureReason.of(cause)` emits.** Since A11 makes the prefix carry evidence, the mapping
+is fixed here rather than left to the implementer. The prefix is the error `code` from the
+vocabulary in `nfr-design.md` §2.2, followed by `": "` and a short human detail; it never
+contains a stack trace or a payload (NFR-17):
+
+| Cause | `failure_reason` | Reachable with |
+|-------|------------------|----------------|
+| Provider unreachable or 503 after retries | `PROVIDER_UNAVAILABLE: <detail> (<status>)` | step 2 incomplete, so no instance ever existed |
+| Billing unreachable or 503 after retries | `BILLING_UNAVAILABLE: <detail> (<status>)` | step 2 complete, so an instance existed and was terminated |
+| Illegal lifecycle transition inside the saga (§6.3: a bug, or a late duplicate task) | `INVALID_STATE_TRANSITION: <from> --<event>--> rejected` | either; the step reached is whatever `failedStep` reports |
+| Any other exception | `INTERNAL_ERROR: <exception class>` | either |
+
+The last two rows are the non-peer path, and for them the prefix deliberately says *nothing*
+about how far the saga got — only the first two rows carry that signal. In the non-peer case the
+"how far" evidence comes from two other places that are present regardless of cause: the
+`saga.compensation.start step=...` line, which logs `failedStep(instanceId, meterStarted)`
+before any undo runs, and the WireMock request journal, where the presence or absence of
+`DELETE /api/v1/provider/instances/{id}` and of the billing stop shows exactly which steps had
+completed. Challenge 3C forces a billing 503, so its evidence always lands on row 2; the other
+two rows exist so that an unexpected failure still produces a reason a reader can act on rather
+than an empty column.
 
 **Why `quietly`.** Each compensating call is wrapped so that a failure is logged and the
 remaining compensations still run. A compensation that aborts half-way is worse than one that
