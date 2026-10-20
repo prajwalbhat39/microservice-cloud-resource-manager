@@ -1,0 +1,64 @@
+# =====================================================================
+# Quota service configuration. Every value is an environment variable with
+# a local default (NFR-18, NFR-19): the service starts against a local
+# PostgreSQL with an empty environment. DB_PASSWORD is the only value that
+# must be supplied anywhere that is not a developer laptop.
+# =====================================================================
+server:
+  port: ${SERVER_PORT:8081}
+
+spring:
+  application:
+    name: quota-service
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:quota_db}
+    username: ${DB_USER:quota_user}
+    password: ${DB_PASSWORD:changeme}
+    hikari:
+      # 25, not the Hikari default of 10: Challenge 1 fires 20 concurrent reserve calls, each
+      # holding one connection for the atomic UPDATE (infrastructure-design.md 5.3).
+      maximum-pool-size: ${DB_POOL_MAX:25}
+  jpa:
+    hibernate:
+      # NEVER auto-DDL (NFR-23). Flyway owns the schema; Hibernate only validates against it.
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+# Structured JSON logging to stdout (NFR-15). Boot's native ECS format carries service.name,
+# the level and the timestamp; the correlation id is added to the MDC by CorrelationIdFilter.
+logging:
+  structured:
+    format:
+      console: ecs
+  level:
+    root: ${LOG_LEVEL:INFO}
+    com.crm: ${LOG_LEVEL_APP:INFO}
+
+# Operability: /health reports liveness and database connectivity (NFR-12). It sits OUTSIDE
+# the /api/v1 prefix because it is an operability endpoint, not a business one (N1).
+management:
+  endpoints:
+    web:
+      base-path: /
+      exposure:
+        include: health
+      path-mapping:
+        health: health
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html

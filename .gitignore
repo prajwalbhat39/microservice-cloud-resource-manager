@@ -1,0 +1,29 @@
+# Maven build output
+target/
+*.class
+
+# Maven wrapper — keep the scripts and properties, ignore any downloaded dist
+.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# OS noise
+Thumbs.db
+.DS_Store
+
+# Logs
+*.log
+
+# Local env overrides (never commit real credentials)
+.env
+*.local.env
+
+# WireMock runtime
+scripts/wiremock/__files/
+wiremock-*.log

@@ -1,0 +1,13 @@
+CHALLENGE 1 - DB STATE AFTER  (2026-10-20 19:30:27 UTC)
+tenant: tnt-br1-20261020-193022
+
+        tenant_id        | cpu_used | cpu_limit | ram_used_gb | ram_limit_gb | instance_used | instance_limit 
+-------------------------+----------+-----------+-------------+--------------+---------------+----------------
+ tnt-br1-20261020-193022 |       20 |        20 |          40 |           64 |             5 |             10
+(1 row)
+
+  state   | rows 
+----------+------
+ RESERVED |    5
+(1 row)
+

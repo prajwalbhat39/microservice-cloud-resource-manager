@@ -85,8 +85,9 @@ After all units:
 - **Phase**: CONSTRUCTION (unit U1)
 - **Stage**: U1 design stages ALL APPROVED. Blocked on the toolchain gate before Code Generation.
 - **Output dir**: `aidlc-docs/construction/u1-core/` (functional-design, nfr-requirements, nfr-design, infrastructure-design, plus review.md / review.json)
-- **Toolchain**: NOT yet installed. Git present; JDK 21, PostgreSQL, Docker, PowerShell 7 outstanding. This is the only thing blocking Code Generation.
-- **Next**: install toolchain, then Code Generation for U1 (emits skeletons: project structure, Flyway baselines, entities, repositories, controller signatures, test stubs — Prajwal writes the business logic)
+- **Toolchain**: JDK 21 ✅ (JAVA_HOME set), PowerShell 7 ✅ (7.6.7), Git ✅ (2.55.0), PostgreSQL ✅ (18.6, psql on PATH). Docker: installed via winget (4.95.0) but not yet completed — needs reboot + Docker Desktop launched. Docker is required ONLY for the Testcontainers tests (BR1/BR3/BR7), the last step, so it does not block Code Generation.
+- **Databases**: `quota_db` + `quota_user`, `resource_db` + `resource_user` created via `scripts/db/setup-u1.sql` (PG15+ corrected grants). Flyway's first migration will confirm the grants are correct.
+- **Next**: Code Generation for U1 — emits skeletons (project structure, Flyway baselines, entities, repositories, controller signatures with validation, test stubs, springdoc wiring). Prajwal writes the business logic.
 - **Artifacts (all approved)**:
   - `inception/requirements/requirements.md`
   - `inception/workflow-plan.md`

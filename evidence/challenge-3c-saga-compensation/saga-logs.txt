@@ -1,0 +1,108 @@
+=============================================================================
+CHALLENGE 3C - APPLICATION LOG EVIDENCE (BR6, saga compensation)
+=============================================================================
+Source      : stdout of the running Resource service
+              (java -jar services/resource/target/resource-service-1.0.0-SNAPSHOT.jar, pid 8912)
+Captured    : 2026-10-20 19:31 UTC, from the same run that produced output.txt / db-after.txt
+Format      : structured JSON, ECS layout, written to stdout (NFR-15)
+Correlation : 3e5ae27b-6f5c-4630-be65-7fd99c81148c
+Resource    : add3dbcc-ab29-4068-9d7a-23f33492c375   (the COMPENSATED one)
+Tenant      : tnt-br6-20261020-193117
+
+These lines are reproduced verbatim from the service console. Nothing is edited,
+reordered or abridged except where marked "[stack_trace omitted]" - the full stack
+traces are many lines of framework frames and are summarised there for width only.
+
+-----------------------------------------------------------------------------
+PART 1 - TIMELINE
+The `message` field of each line, in the order the service emitted it. Every line
+below carries the SAME correlationId, which is the point of NFR-13/NFR-14/NFR-16:
+one id assembles the whole business transaction, INCLUDING the half that runs after
+the 202 on a different thread (note the thread column: http-nio for the synchronous
+reserve, then saga-4 for everything after the async boundary).
+-----------------------------------------------------------------------------
+
+  time (UTC)        thread              level  message
+  ----------------  ------------------  -----  ----------------------------------------------------------
+  19:31:24.256178   http-nio-8082-exec-4 INFO  quota.reserved resourceId=add3dbcc-... tenantId=tnt-br6-20261020-193117 replay=false
+  19:31:24.276190   saga-4               INFO  lifecycle.transition resourceId=add3dbcc-... from=REQUESTED event=PROVISION_STARTED to=PROVISIONING
+  19:31:24.284715   saga-4               INFO  provider.provisioned instanceId=i-mock-1b2b73f clientToken=ct-add3dbcc-...
+  19:31:24.288719   saga-4               INFO  lifecycle.transition resourceId=add3dbcc-... from=PROVISIONING event=INSTANCE_CREATED to=PROVISIONING
+  19:31:24.307721   saga-4               WARN  peer.retry operation=billing meter start attempt=1 of=3 reason=ServiceUnavailable
+  19:31:24.571591   saga-4               WARN  peer.retry operation=billing meter start attempt=2 of=3 reason=ServiceUnavailable
+  19:31:25.155845   saga-4               ERROR peer.unavailable operation=billing meter start attempts=3 status=503
+  19:31:25.172458   saga-4               ERROR saga.compensation.start step=START_BILLING reason=BILLING_UNAVAILABLE: billing meter start failed after 3 attempts (503)
+  19:31:25.179469   saga-4               INFO  provider.terminated instanceId=i-mock-1b2b73f status=200
+  19:31:25.232308   saga-4               INFO  lifecycle.transition resourceId=add3dbcc-... from=PROVISIONING event=SAGA_FAILED to=FAILED
+  19:31:25.244320   saga-4               INFO  notification.sent eventType=FAILED resourceId=add3dbcc-...
+  19:31:25.245339   saga-4               ERROR saga.compensation.done resourceId=add3dbcc-... status=FAILED
+
+WHAT THIS SHOWS, line by line:
+  * quota.reserved          - step 1 succeeded SYNCHRONOUSLY, before the client's 202. Quota is now held.
+  * provider.provisioned    - step 2 succeeded. A real instance id exists: i-mock-1b2b73f.
+  * peer.retry x2 then
+    peer.unavailable        - step 3 was retried with backoff (NFR-26) before being given up on,
+                              not abandoned on the first 503. 3 attempts, final status 503.
+  * saga.compensation.start - the catch block fired. step=START_BILLING records exactly how far
+                              the saga got, which is the signal that replaces the (now cleared)
+                              provider_instance_id column - recorded deviation A11.
+  * provider.terminated     - compensation undid step 2. The instance created moments earlier is gone
+                              (the id matches: i-mock-1b2b73f).
+  * SAGA_FAILED transition  - the resource is recorded FAILED. This is the queryable saga state
+                              (AC-3.1); there are deliberately no saga coordination tables.
+  * notification.sent
+    eventType=FAILED        - the tenant was told (AC-3.6). Best effort, outside compensation (FR-33).
+  * saga.compensation.done  - compensation completed.
+
+NOT VISIBLE IN THIS SERVICE'S LOG, BY DESIGN:
+  The quota release (undo of step 1) is an HTTP call to the Quota service, so it is logged
+  by THAT service and proven in db-after.txt, where the ledger row for add3dbcc-... shows
+  state=RELEASED with a released_at timestamp. The `quietly(...)` wrapper means a
+  compensating step that fails is logged and the remaining steps still run, so the absence
+  of an error line here is itself the evidence that every undo succeeded.
+
+-----------------------------------------------------------------------------
+PART 2 - RAW LINES, VERBATIM
+-----------------------------------------------------------------------------
+
+{"@timestamp":"2026-10-20T19:31:24.256178900Z","log":{"level":"INFO","logger":"com.crm.resource.domain.service.ProvisioningService"},"process":{"pid":8912,"thread":{"name":"http-nio-8082-exec-4"}},"service":{"name":"resource","version":"1.0.0-SNAPSHOT","node":{}},"message":"quota.reserved resourceId=add3dbcc-ab29-4068-9d7a-23f33492c375 tenantId=tnt-br6-20261020-193117 replay=false","correlationId":"3e5ae27b-6f5c-4630-be65-7fd99c81148c","ecs":{"version":"8.11"}}
+
+{"@timestamp":"2026-10-20T19:31:24.276190500Z","log":{"level":"INFO","logger":"com.crm.resource.domain.ResourceLifecycle"},"process":{"pid":8912,"thread":{"name":"saga-4"}},"service":{"name":"resource","version":"1.0.0-SNAPSHOT","node":{}},"message":"lifecycle.transition resourceId=add3dbcc-ab29-4068-9d7a-23f33492c375 from=REQUESTED event=PROVISION_STARTED to=PROVISIONING","correlationId":"3e5ae27b-6f5c-4630-be65-7fd99c81148c","ecs":{"version":"8.11"}}
+
+{"@timestamp":"2026-10-20T19:31:24.284715500Z","log":{"level":"INFO","logger":"com.crm.resource.client.ProviderClient"},"process":{"pid":8912,"thread":{"name":"saga-4"}},"service":{"name":"resource","version":"1.0.0-SNAPSHOT","node":{}},"message":"provider.provisioned instanceId=i-mock-1b2b73f clientToken=ct-add3dbcc-ab29-4068-9d7a-23f33492c375","correlationId":"3e5ae27b-6f5c-4630-be65-7fd99c81148c","ecs":{"version":"8.11"}}
+
+{"@timestamp":"2026-10-20T19:31:24.288719900Z","log":{"level":"INFO","logger":"com.crm.resource.domain.ResourceLifecycle"},"process":{"pid":8912,"thread":{"name":"saga-4"}},"service":{"name":"resource","version":"1.0.0-SNAPSHOT","node":{}},"message":"lifecycle.transition resourceId=add3dbcc-ab29-4068-9d7a-23f33492c375 from=PROVISIONING event=INSTANCE_CREATED to=PROVISIONING","correlationId":"3e5ae27b-6f5c-4630-be65-7fd99c81148c","ecs":{"version":"8.11"}}
+
+{"@timestamp":"2026-10-20T19:31:24.307721Z","log":{"level":"WARN","logger":"com.crm.resource.client.PeerRetry"},"process":{"pid":8912,"thread":{"name":"saga-4"}},"service":{"name":"resource","version":"1.0.0-SNAPSHOT","node":{}},"message":"peer.retry operation=billing meter start attempt=1 of=3 reason=ServiceUnavailable","correlationId":"3e5ae27b-6f5c-4630-be65-7fd99c81148c","ecs":{"version":"8.11"}}
+
+{"@timestamp":"2026-10-20T19:31:24.571591700Z","log":{"level":"WARN","logger":"com.crm.resource.client.PeerRetry"},"process":{"pid":8912,"thread":{"name":"saga-4"}},"service":{"name":"resource","version":"1.0.0-SNAPSHOT","node":{}},"message":"peer.retry operation=billing meter start attempt=2 of=3 reason=ServiceUnavailable","correlationId":"3e5ae27b-6f5c-4630-be65-7fd99c81148c","ecs":{"version":"8.11"}}
+
+{"@timestamp":"2026-10-20T19:31:25.155845300Z","log":{"level":"ERROR","logger":"com.crm.resource.client.PeerRetry"},"process":{"pid":8912,"thread":{"name":"saga-4"}},"service":{"name":"resource","version":"1.0.0-SNAPSHOT","node":{}},"message":"peer.unavailable operation=billing meter start attempts=3 status=503","correlationId":"3e5ae27b-6f5c-4630-be65-7fd99c81148c","error":{"type":"org.springframework.web.client.HttpServerErrorException$ServiceUnavailable","message":"503 Service Unavailable: \"{\"error\": \"simulated failure via X-Simulate-Failure\"}\"","stack_trace":"[stack_trace omitted for width - originates at BillingClient.startMeter(BillingClient.java:54) called from ProvisioningSaga.run(ProvisioningSaga.java:114)]"},"ecs":{"version":"8.11"}}
+
+{"@timestamp":"2026-10-20T19:31:25.172458100Z","log":{"level":"ERROR","logger":"com.crm.resource.domain.service.ProvisioningSaga"},"process":{"pid":8912,"thread":{"name":"saga-4"}},"service":{"name":"resource","version":"1.0.0-SNAPSHOT","node":{}},"message":"saga.compensation.start step=START_BILLING reason=BILLING_UNAVAILABLE: billing meter start failed after 3 attempts (503)","correlationId":"3e5ae27b-6f5c-4630-be65-7fd99c81148c","error":{"type":"com.crm.resource.common.error.DownstreamUnavailableException","message":"billing meter start failed after 3 attempts (503)","stack_trace":"[stack_trace omitted for width - originates at PeerRetry.unavailable(PeerRetry.java:105) via BillingClient.startMeter(BillingClient.java:54) from ProvisioningSaga.run(ProvisioningSaga.java:114)]"},"ecs":{"version":"8.11"}}
+
+{"@timestamp":"2026-10-20T19:31:25.179469Z","log":{"level":"INFO","logger":"com.crm.resource.client.ProviderClient"},"process":{"pid":8912,"thread":{"name":"saga-4"}},"service":{"name":"resource","version":"1.0.0-SNAPSHOT","node":{}},"message":"provider.terminated instanceId=i-mock-1b2b73f status=200","correlationId":"3e5ae27b-6f5c-4630-be65-7fd99c81148c","ecs":{"version":"8.11"}}
+
+{"@timestamp":"2026-10-20T19:31:25.232308600Z","log":{"level":"INFO","logger":"com.crm.resource.domain.ResourceLifecycle"},"process":{"pid":8912,"thread":{"name":"saga-4"}},"service":{"name":"resource","version":"1.0.0-SNAPSHOT","node":{}},"message":"lifecycle.transition resourceId=add3dbcc-ab29-4068-9d7a-23f33492c375 from=PROVISIONING event=SAGA_FAILED to=FAILED","correlationId":"3e5ae27b-6f5c-4630-be65-7fd99c81148c","ecs":{"version":"8.11"}}
+
+{"@timestamp":"2026-10-20T19:31:25.244320200Z","log":{"level":"INFO","logger":"com.crm.resource.client.NotificationClient"},"process":{"pid":8912,"thread":{"name":"saga-4"}},"service":{"name":"resource","version":"1.0.0-SNAPSHOT","node":{}},"message":"notification.sent eventType=FAILED resourceId=add3dbcc-ab29-4068-9d7a-23f33492c375","correlationId":"3e5ae27b-6f5c-4630-be65-7fd99c81148c","ecs":{"version":"8.11"}}
+
+{"@timestamp":"2026-10-20T19:31:25.245339400Z","log":{"level":"ERROR","logger":"com.crm.resource.domain.service.ProvisioningSaga"},"process":{"pid":8912,"thread":{"name":"saga-4"}},"service":{"name":"resource","version":"1.0.0-SNAPSHOT","node":{}},"message":"saga.compensation.done resourceId=add3dbcc-ab29-4068-9d7a-23f33492c375 status=FAILED","correlationId":"3e5ae27b-6f5c-4630-be65-7fd99c81148c","ecs":{"version":"8.11"}}
+
+-----------------------------------------------------------------------------
+PART 3 - THE HAPPY PATH, FOR CONTRAST
+Same run, the resource provisioned WITHOUT the injection header.
+correlationId 2ce459f3-eea0-4c6a-b07e-b9d405afa61c, resource 863f6e47-eb24-40ab-a118-774e52a1870b.
+Note there is no peer.retry, no compensation, and the lifecycle ends at ACTIVE.
+-----------------------------------------------------------------------------
+
+  19:31:18.696450   http-nio-8082-exec-8 INFO  quota.reserved resourceId=863f6e47-... tenantId=tnt-br6-20261020-193117 replay=false
+  19:31:18.713891   saga-3               INFO  lifecycle.transition resourceId=863f6e47-... from=REQUESTED event=PROVISION_STARTED to=PROVISIONING
+  19:31:18.723895   saga-3               INFO  provider.provisioned instanceId=i-mock-5450725 clientToken=ct-863f6e47-...
+  19:31:18.726890   saga-3               INFO  lifecycle.transition resourceId=863f6e47-... from=PROVISIONING event=INSTANCE_CREATED to=PROVISIONING
+  19:31:18.736890   saga-3               INFO  billing.meter.started resourceId=863f6e47-...
+  19:31:18.741902   saga-3               INFO  lifecycle.transition resourceId=863f6e47-... from=PROVISIONING event=ACTIVATED to=ACTIVE
+  19:31:18.751912   saga-3               INFO  saga.completed resourceId=863f6e47-... instanceId=i-mock-5450725
+  19:31:18.756909   saga-3               INFO  notification.sent eventType=ACTIVE resourceId=863f6e47-...
+
+=============================================================================

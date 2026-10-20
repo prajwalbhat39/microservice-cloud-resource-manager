@@ -1,0 +1,25 @@
+CHALLENGE 2 - DB STATE BEFORE  (2026-10-20 19:30:46 UTC)
+tenant: tnt-br2-20261020-193046
+
+--- resource_db: rows for this tenant ---
+ resources 
+-----------
+         0
+(1 row)
+
+ reservations 
+--------------
+            0
+(1 row)
+
+ idempotency_records 
+---------------------
+                   0
+(1 row)
+
+--- quota_db: usage for this tenant ---
+ cpu_used | instance_used 
+----------+---------------
+        0 |             0
+(1 row)
+

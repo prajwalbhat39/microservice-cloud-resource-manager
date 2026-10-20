@@ -1,0 +1,102 @@
+# =====================================================================
+# Resource / Orchestrator service configuration. Every value is an
+# environment variable with a local default (NFR-18, NFR-19). During U1,
+# the three downstream peers (Provider, Billing, Notification) point at
+# WireMock on one port (8090); only Quota is a real peer in this unit.
+# =====================================================================
+server:
+  port: ${SERVER_PORT:8082}
+
+spring:
+  application:
+    name: resource
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:resource_db}
+    username: ${DB_USER:resource_user}
+    password: ${DB_PASSWORD:changeme}
+    hikari:
+      # 25: sized the same as Quota (infrastructure-design.md 5.3) — Challenge 1's 20 concurrent
+      # provisioning requests each hold one orchestrator connection through the synchronous half.
+      maximum-pool-size: ${DB_POOL_MAX:25}
+  jpa:
+    hibernate:
+      ddl-auto: validate   # NFR-23: Flyway owns the schema
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+logging:
+  structured:
+    format:
+      console: ecs
+  level:
+    root: ${LOG_LEVEL:INFO}
+    com.crm: ${LOG_LEVEL_APP:INFO}
+
+management:
+  endpoints:
+    web:
+      base-path: /
+      exposure:
+        include: health
+      path-mapping:
+        health: health
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+# ---------------------------------------------------------------------
+# Peer base URLs. During U1, Provider/Billing/Notification point at
+# WireMock (one standalone process, infrastructure-design.md 8) on 8090.
+# Quota is real and lives at its own port.
+# ---------------------------------------------------------------------
+peers:
+  quota:
+    base-url: ${QUOTA_SERVICE_URL:http://localhost:8081}
+    connect-timeout-ms: ${QUOTA_CONNECT_TIMEOUT_MS:2000}
+    read-timeout-ms: ${QUOTA_READ_TIMEOUT_MS:2000}
+  provider:
+    base-url: ${PROVIDER_SERVICE_URL:http://localhost:8090}
+    connect-timeout-ms: ${PROVIDER_CONNECT_TIMEOUT_MS:2000}
+    read-timeout-ms: ${PROVIDER_READ_TIMEOUT_MS:10000}
+  billing:
+    base-url: ${BILLING_SERVICE_URL:http://localhost:8090}
+    connect-timeout-ms: ${BILLING_CONNECT_TIMEOUT_MS:2000}
+    read-timeout-ms: ${BILLING_READ_TIMEOUT_MS:3000}
+  notification:
+    base-url: ${NOTIFICATION_SERVICE_URL:http://localhost:8090}
+    connect-timeout-ms: ${NOTIFICATION_CONNECT_TIMEOUT_MS:2000}
+    read-timeout-ms: ${NOTIFICATION_READ_TIMEOUT_MS:2000}
+
+retry:
+  max-attempts: ${RETRY_MAX_ATTEMPTS:3}
+  initial-backoff-ms: ${RETRY_INITIAL_BACKOFF_MS:200}
+  multiplier: ${RETRY_MULTIPLIER:2.0}
+  max-backoff-ms: ${RETRY_MAX_BACKOFF_MS:2000}
+  jitter-ratio: ${RETRY_JITTER_RATIO:0.5}
+
+saga:
+  pool:
+    core: ${SAGA_POOL_CORE:4}
+    max: ${SAGA_POOL_MAX:8}
+    queue: ${SAGA_POOL_QUEUE:100}
+
+idempotency:
+  retention-hours: ${IDEMPOTENCY_RETENTION_HOURS:24}
+  sweep-interval-ms: ${IDEMPOTENCY_SWEEP_INTERVAL_MS:3600000}
+
+billing:
+  rate-per-cpu-hour: ${BILLING_RATE_PER_CPU_HOUR:0.12}

@@ -1,0 +1,55 @@
+=============================================================================
+CHALLENGE 3C - DOWNSTREAM CALL JOURNAL
+=============================================================================
+Source   : stdout of scripts/peer-stub.py, the local stand-in for the Provider,
+           Billing and Notification services (all three answer on :8090).
+Captured : 2026-10-20 19:31 UTC, from the same run that produced output.txt / saga-logs.txt
+
+This is the view from the OTHER side of the wire: which downstream calls the
+orchestrator's saga actually made, and what each returned. It corroborates
+saga-logs.txt independently of the orchestrator's own account of itself.
+
+Reproduced verbatim. One line per request, in the order received. These are the
+LAST FIVE lines of this run - the compensated provision (the full stub console also
+contains the happy-path provision from the same run and calls from earlier runs).
+
+-----------------------------------------------------------------------------
+peer-stub "POST /api/v1/provider/instances HTTP/1.1" 201 -
+peer-stub "POST /api/v1/billing/meters HTTP/1.1" 503 -
+peer-stub "POST /api/v1/billing/meters HTTP/1.1" 503 -
+peer-stub "POST /api/v1/billing/meters HTTP/1.1" 503 -
+peer-stub "DELETE /api/v1/provider/instances/i-mock-1b2b73f HTTP/1.1" 200 -
+peer-stub "POST /api/v1/notifications HTTP/1.1" 202 -
+-----------------------------------------------------------------------------
+
+READING THE COMPENSATED PROVISION (these six lines, in order):
+    POST   /provider/instances                  -> 201   step 2 SUCCEEDED (instance i-mock-1b2b73f)
+    POST   /billing/meters                      -> 503   step 3 attempt 1
+    POST   /billing/meters                      -> 503   step 3 attempt 2
+    POST   /billing/meters                      -> 503   step 3 attempt 3 - given up
+    DELETE /provider/instances/i-mock-1b2b73f   -> 200   COMPENSATION: undo step 2
+    POST   /notifications                       -> 202   tenant told of the failure
+
+Three things are provable from those lines alone:
+
+  1. Billing was retried THREE times before the saga gave up (NFR-26), rather than
+     failing on first contact.
+
+  2. The provider instance that step 2 created was explicitly DELETED by id. The id
+     in the DELETE (i-mock-1b2b73f) is the SAME id the POST returned and the same id
+     the orchestrator logged in saga-logs.txt, so compensation undid the exact
+     instance this saga created - not a blind cleanup.
+
+  3. There is NO "POST /billing/meters/{id}/stop" for this resource. That is correct
+     and is the point of "only compensate steps that actually completed": the meter
+     never started, so there was nothing to stop. Had the saga blindly run every undo,
+     a stop call would appear here.
+
+  The quota release (the undo of step 1) is absent from THIS journal because Quota is
+  a REAL service on :8081, not part of this stub. It is evidenced in db-after.txt,
+  where that resource's ledger row reads state=RELEASED with a released_at timestamp.
+
+For the HAPPY-PATH provision in the same run (three lines earlier in the console:
+POST /provider/instances -> 201, POST /billing/meters -> 201, POST /notifications
+-> 202, with NO DELETE) the resource reached ACTIVE and nothing was undone.
+=============================================================================

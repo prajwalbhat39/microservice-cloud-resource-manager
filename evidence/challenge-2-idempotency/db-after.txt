@@ -1,0 +1,36 @@
+CHALLENGE 2 - DB STATE AFTER  (2026-10-20 19:30:58 UTC)
+tenant: tnt-br2-20261020-193046
+
+--- idempotency_records for this run's two keys (expect exactly 2: one per key) ---
+        idempotency_key         |   state   | response_status 
+--------------------------------+-----------+-----------------
+ key-concurrent-20261020-193046 | COMPLETED |             202
+ key-sequential-20261020-193046 | COMPLETED |             202
+(2 rows)
+
+--- resources for this tenant (expect exactly 2: one sequential + one concurrent) ---
+             resource_id              |   type    | cpu | ram_gb | status 
+--------------------------------------+-----------+-----+--------+--------
+ 793fcfc8-4a16-41f4-a33e-6cfd0fe9aeba | CONTAINER |   2 |      4 | ACTIVE
+ 941f1d41-973a-4ccf-a918-cbf5babaa2c8 | VM        |   4 |      8 | ACTIVE
+(2 rows)
+
+--- reservations for this tenant (expect exactly 2) ---
+            reservation_id            |  status   
+--------------------------------------+-----------
+ 34b48185-cb69-4419-b64b-5d84bc836444 | COMPLETED
+ 58c56998-b0c9-44f0-8b71-f218b559534b | COMPLETED
+(2 rows)
+
+--- quota_db: usage. 4+2=6 CPU, 2 instances. NOT 4+(10x2) and NOT doubled ---
+ cpu_used | ram_used_gb | instance_used 
+----------+-------------+---------------
+        6 |          12 |             2
+(1 row)
+
+--- quota_db: ledger rows for this tenant (expect exactly 2) ---
+ ledger_rows 
+-------------
+           2
+(1 row)
+
