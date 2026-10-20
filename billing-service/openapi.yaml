@@ -1,0 +1,155 @@
+openapi: 3.0.3
+info:
+  title: Billing Service API
+  version: 1.0.0
+servers:
+  - url: http://localhost:8083
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Service health
+  /api/v1/billing/meters:
+    post:
+      summary: Start meter (idempotent on resourceId)
+      parameters:
+        - in: header
+          name: X-Simulate-Failure
+          schema:
+            type: boolean
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartMeterRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeterResponse'
+        '200':
+          description: Replay for same resourceId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeterResponse'
+        '400':
+          description: Bad request
+        '503':
+          description: Simulated failure
+  /api/v1/billing/meters/{resourceId}/stop:
+    post:
+      summary: Stop meter (idempotent)
+      parameters:
+        - in: path
+          name: resourceId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Stopped
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeterResponse'
+        '404':
+          description: Meter not found
+  /api/v1/billing/meters/{resourceId}:
+    get:
+      summary: Read meter and current cost
+      parameters:
+        - in: path
+          name: resourceId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Meter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeterResponse'
+        '404':
+          description: Meter not found
+  /api/v1/billing/tenants/{tenantId}/cost:
+    get:
+      summary: Month-to-date tenant cost
+      parameters:
+        - in: path
+          name: tenantId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: period
+          required: true
+          schema:
+            type: string
+            example: 2026-10
+      responses:
+        '200':
+          description: Tenant cost
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantCostResponse'
+        '400':
+          description: Invalid period
+components:
+  schemas:
+    StartMeterRequest:
+      type: object
+      required: [resourceId, tenantId, cpu]
+      properties:
+        resourceId:
+          type: string
+        tenantId:
+          type: string
+        cpu:
+          type: integer
+          minimum: 1
+        ratePerCpuHour:
+          type: number
+    MeterResponse:
+      type: object
+      properties:
+        meterId:
+          type: string
+          format: uuid
+        resourceId:
+          type: string
+        tenantId:
+          type: string
+        cpu:
+          type: integer
+        ratePerCpuHour:
+          type: number
+        state:
+          type: string
+          enum: [ACTIVE, STOPPED]
+        startedAt:
+          type: string
+          format: date-time
+        stoppedAt:
+          type: string
+          format: date-time
+          nullable: true
+        currentCost:
+          type: number
+    TenantCostResponse:
+      type: object
+      properties:
+        tenantId:
+          type: string
+        period:
+          type: string
+        totalCost:
+          type: number
+
