@@ -231,14 +231,14 @@ Testing:
 ```
 
 **Acceptance Criteria:**
-- [ ] Provider service runs on :8085, passes health check
-- [ ] Provisioning is idempotent on `client_token`
-- [ ] Simulated delay and failure work (configurable)
-- [ ] X-Simulate-Failure header forces 503
-- [ ] Termination is idempotent
-- [ ] FR-19 and FR-43 tests pass
-- [ ] OpenAPI spec generated and committed
-- [ ] README documents configuration variables
+- [x] Provider service defaults to :8085; live HTTP health check includes database connectivity
+- [x] Provisioning is idempotent on `client_token` (including 16 concurrent HTTP calls)
+- [x] Simulated delay and failure work (configurable)
+- [x] X-Simulate-Failure header forces 503 for new operations; persisted replays bypass simulation
+- [x] Termination is idempotent
+- [x] FR-19 and FR-43 tests pass
+- [x] OpenAPI spec generated and committed with U3
+- [x] README documents configuration variables
 
 ---
 

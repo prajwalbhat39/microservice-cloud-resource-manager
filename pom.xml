@@ -12,13 +12,14 @@
     <description>
         Root aggregator. Builds all services with one command (NFR-1, NFR-6). It is NOT a parent:
         each service inherits spring-boot-starter-parent directly and carries its own Maven
-        wrapper, so every service is independently buildable and runnable. Modules for U2-U4
-        (billing, provider, notification, usage-aggregator, expiry-worker) are added when those
+        wrapper, so every service is independently buildable and runnable. Remaining modules
+        (billing, notification, usage-aggregator, expiry-worker) are added when those
         units are built.
     </description>
 
     <modules>
         <module>services/quota</module>
         <module>services/resource</module>
+        <module>services/provider</module>
     </modules>
 </project>

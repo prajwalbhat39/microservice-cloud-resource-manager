@@ -1,0 +1,49 @@
+server:
+  port: ${SERVER_PORT:8085}
+
+spring:
+  application:
+    name: provider-service
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:provider_db}
+    username: ${DB_USER:provider_user}
+    password: ${DB_PASSWORD:changeme}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX:10}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+provider:
+  failure-rate: ${PROVIDER_FAILURE_RATE:0.2}
+  delay-min-ms: ${PROVIDER_DELAY_MIN_MS:1000}
+  delay-max-ms: ${PROVIDER_DELAY_MAX_MS:3000}
+  slow-delay-ms: ${PROVIDER_SLOW_DELAY_MS:10000}
+
+logging:
+  structured:
+    format:
+      console: ecs
+  level:
+    root: ${LOG_LEVEL:INFO}
+    com.crm: ${LOG_LEVEL_APP:INFO}
+
+management:
+  endpoints:
+    web:
+      base-path: /
+      exposure:
+        include: health
+      path-mapping:
+        health: health
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
