@@ -51,7 +51,11 @@ clearing `provider_instance_id`, and the previously unspecified `FailureReason.o
 mapping (now a four-row table in §9.5 covering the non-peer failure path).
 
 **Unit U2 — Billing (Karan)** — not started
-**Unit U3 — Provider mock (Vinayak)** — not started
+**Unit U3 — Provider mock (Vinayak)** — implemented and verified (2026-10-21)
+- Independent `services/provider` Maven module, port 8085, dedicated `provider_db`.
+- Atomic client-token idempotency, termination, configurable delays/failures and header overrides.
+- 19 unit tests and 16 real-PostgreSQL HTTP integration tests passed; no skipped tests.
+- Generated OpenAPI, configuration/run instructions and database setup script committed with U3.
 **Unit U4 — Notification + Aggregator + Worker (Siddharth)** — not started
 
 After all units:

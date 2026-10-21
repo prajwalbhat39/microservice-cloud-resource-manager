@@ -1,0 +1,155 @@
+openapi: 3.1.0
+info:
+  title: Provider Mock Service API
+  description: Idempotent instance provisioning and termination with simulated delays
+    and failures.
+  version: v1
+servers:
+- url: http://localhost:8085
+  description: Generated server url
+paths:
+  /api/v1/provider/instances:
+    post:
+      tags:
+      - provider-controller
+      summary: Provision an instance
+      description: "Returns the existing instance for a known clientToken, including\
+        \ after termination. Replays bypass simulation and never create another instance."
+      operationId: provision
+      parameters:
+      - name: X-Simulate-Failure
+        in: header
+        description: "always-fail (or true), always-succeed (or false), slow; unknown\
+          \ values use defaults"
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProvisionInstanceRequest"
+        required: true
+      responses:
+        "400":
+          description: Invalid input
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Simulated failure or interrupted operation
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "201":
+          description: Created or replayed instance
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/InstanceResponse"
+  /api/v1/provider/instances/{id}:
+    delete:
+      tags:
+      - provider-controller
+      summary: Terminate an instance
+      description: Retains the instance and client token. Repeated termination returns
+        200 without simulation.
+      operationId: terminate
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: X-Simulate-Failure
+        in: header
+        description: Same simulation modes as provisioning
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Terminated or already terminated instance
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/InstanceResponse"
+        "404":
+          description: Unknown instance
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "400":
+          description: Invalid input
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Simulated failure or interrupted operation
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+components:
+  schemas:
+    ProvisionInstanceRequest:
+      type: object
+      properties:
+        clientToken:
+          type: string
+          maxLength: 256
+          minLength: 0
+        type:
+          type: string
+          enum:
+          - VM
+          - CONTAINER
+          - CLUSTER
+          minLength: 1
+          pattern: VM|CONTAINER|CLUSTER
+        cpu:
+          type: integer
+          format: int32
+          maximum: 256
+          minimum: 1
+        ramGb:
+          type: integer
+          format: int32
+          maximum: 2048
+          minimum: 1
+      required:
+      - clientToken
+      - cpu
+      - ramGb
+      - type
+    ProblemDetail:
+      type: object
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+          format: int32
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri
+        properties:
+          type: object
+          additionalProperties:
+            type: object
+    InstanceResponse:
+      type: object
+      properties:
+        instanceId:
+          type: string
+        status:
+          type: string
