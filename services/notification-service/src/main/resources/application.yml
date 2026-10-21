@@ -1,0 +1,53 @@
+server:
+  port: ${SERVER_PORT:8084}
+spring:
+  application:
+    name: notification
+  main:
+    banner-mode: 'off'
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:notification_db}
+    username: ${DB_USER:notification_user}
+    password: ${DB_PASSWORD:changeme}
+    hikari:
+      connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:2000}
+      maximum-pool-size: ${DB_POOL_MAX:5}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate.jdbc.time_zone: UTC
+  flyway:
+    enabled: true
+  mvc:
+    problemdetails:
+      enabled: true
+logging:
+  level:
+    root: ${LOG_LEVEL:INFO}
+  structured:
+    format:
+      console: logstash
+    json:
+      add:
+        service: ${spring.application.name}
+management:
+  endpoints:
+    web:
+      base-path: /
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: always
+springdoc:
+  show-actuator: true
+  writer-with-order-by-keys: true
+  writer-with-default-pretty-printer: true
+
+notification:
+  delivery:
+    max-attempts: ${NOTIFICATION_MAX_ATTEMPTS:3}
+    failure-rate: ${NOTIFICATION_FAILURE_RATE:0.0}
+    retry-interval-ms: ${NOTIFICATION_RETRY_INTERVAL_MS:30000}

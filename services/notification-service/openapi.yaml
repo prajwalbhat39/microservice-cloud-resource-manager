@@ -1,0 +1,209 @@
+openapi: 3.1.0
+info:
+  title: CRM Notification
+  version: v1
+servers:
+- url: /
+tags:
+- description: Monitor and interact
+  externalDocs:
+    description: Spring Boot Actuator Web API Documentation
+    url: https://docs.spring.io/spring-boot/docs/current/actuator-api/html/
+  name: Actuator
+paths:
+  /api/v1/notifications:
+    get:
+      operationId: history
+      parameters:
+      - in: query
+        name: tenantId
+        required: true
+        schema:
+          type: string
+          maxLength: 64
+          minLength: 0
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Response"
+          description: "History, including pending and exhausted deliveries"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "VALIDATION_FAILED: tenantId required, at most 64 characters"
+        "503":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "NOTIFICATION_UNAVAILABLE: persistence unavailable"
+      summary: Read a tenant's notification history
+      tags:
+      - notification-controller
+    post:
+      operationId: record
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Request"
+        required: true
+      responses:
+        "202":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response"
+          description: Durably accepted; delivery may be pending or exhausted
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: VALIDATION_FAILED or MALFORMED_REQUEST
+        "503":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "NOTIFICATION_UNAVAILABLE: persistence unavailable"
+      summary: Record and simulate delivery of a lifecycle notification
+      tags:
+      - notification-controller
+  /health:
+    get:
+      operationId: health
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+            application/vnd.spring-boot.actuator.v2+json:
+              schema:
+                type: object
+            application/vnd.spring-boot.actuator.v3+json:
+              schema:
+                type: object
+          description: OK
+        "503":
+          content:
+            application/json:
+              schema:
+                type: object
+            application/vnd.spring-boot.actuator.v2+json:
+              schema:
+                type: object
+            application/vnd.spring-boot.actuator.v3+json:
+              schema:
+                type: object
+          description: Service or its database is unavailable
+      summary: Actuator web endpoint 'health'
+      tags:
+      - Actuator
+components:
+  schemas:
+    ProblemDetail:
+      type: object
+      additionalProperties: true
+      properties:
+        code:
+          type: string
+        correlationId:
+          type: string
+        detail:
+          type:
+          - string
+          - "null"
+        instance:
+          type:
+          - string
+          - "null"
+          format: uri
+        status:
+          type: integer
+          format: int32
+        timestamp:
+          type: string
+          format: date-time
+        title:
+          type:
+          - string
+          - "null"
+        type:
+          type: string
+          format: uri
+      required:
+      - code
+      - correlationId
+      - detail
+      - instance
+      - status
+      - timestamp
+      - title
+      - type
+    Request:
+      type: object
+      properties:
+        eventType:
+          type: string
+          enum:
+          - ACTIVE
+          - FAILED
+          - TERMINATED
+        message:
+          type: string
+          maxLength: 2000
+          minLength: 0
+        resourceId:
+          type: string
+          maxLength: 64
+          minLength: 0
+        tenantId:
+          type: string
+          maxLength: 64
+          minLength: 0
+      required:
+      - eventType
+      - message
+      - resourceId
+      - tenantId
+    Response:
+      type: object
+      properties:
+        attempts:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        eventType:
+          type: string
+          enum:
+          - ACTIVE
+          - FAILED
+          - TERMINATED
+        message:
+          type: string
+        notificationId:
+          type: string
+          format: uuid
+        resourceId:
+          type: string
+        sentAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum:
+          - PENDING
+          - SENT
+          - FAILED
+        tenantId:
+          type: string

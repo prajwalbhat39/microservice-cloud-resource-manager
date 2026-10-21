@@ -1,0 +1,42 @@
+server:
+  port: ${SERVER_PORT:8087}
+spring:
+  application:
+    name: expiry-worker
+  main:
+    banner-mode: 'off'
+  mvc:
+    problemdetails:
+      enabled: true
+logging:
+  level:
+    root: ${LOG_LEVEL:INFO}
+  structured:
+    format:
+      console: logstash
+    json:
+      add:
+        service: ${spring.application.name}
+management:
+  endpoints:
+    web:
+      base-path: /
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: always
+springdoc:
+  show-actuator: true
+  writer-with-order-by-keys: true
+  writer-with-default-pretty-printer: true
+
+peers:
+  resource:
+    url: ${RESOURCE_SERVICE_URL:http://localhost:8082}
+    connect-timeout-ms: ${RESOURCE_CONNECT_TIMEOUT_MS:1000}
+    read-timeout-ms: ${RESOURCE_READ_TIMEOUT_MS:2000}
+
+expiry:
+  enabled: ${EXPIRY_ENABLED:true}
+  check-interval-ms: ${EXPIRY_CHECK_INTERVAL_MS:30000}

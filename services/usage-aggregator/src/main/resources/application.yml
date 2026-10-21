@@ -1,0 +1,46 @@
+server:
+  port: ${SERVER_PORT:8086}
+spring:
+  application:
+    name: usage-aggregator
+  main:
+    banner-mode: 'off'
+  mvc:
+    problemdetails:
+      enabled: true
+logging:
+  level:
+    root: ${LOG_LEVEL:INFO}
+  structured:
+    format:
+      console: logstash
+    json:
+      add:
+        service: ${spring.application.name}
+management:
+  endpoints:
+    web:
+      base-path: /
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: always
+springdoc:
+  show-actuator: true
+  writer-with-order-by-keys: true
+  writer-with-default-pretty-printer: true
+
+peers:
+  quota:
+    url: ${QUOTA_SERVICE_URL:http://localhost:8081}
+    connect-timeout-ms: ${QUOTA_CONNECT_TIMEOUT_MS:1000}
+    read-timeout-ms: ${QUOTA_READ_TIMEOUT_MS:2000}
+  resource:
+    url: ${RESOURCE_SERVICE_URL:http://localhost:8082}
+    connect-timeout-ms: ${RESOURCE_CONNECT_TIMEOUT_MS:1000}
+    read-timeout-ms: ${RESOURCE_READ_TIMEOUT_MS:2000}
+  billing:
+    url: ${BILLING_SERVICE_URL:http://localhost:8083}
+    connect-timeout-ms: ${BILLING_CONNECT_TIMEOUT_MS:1000}
+    read-timeout-ms: ${BILLING_READ_TIMEOUT_MS:2000}

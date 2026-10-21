@@ -1,0 +1,1031 @@
+{
+  "requests": [
+    {
+      "id": "7b0386fe-4d75-47b9-84cc-f7aa1bf8e3ee",
+      "request": {
+        "url": "/api/v1/resources/9acab2eb-41fe-48c9-b94e-d51571fe95cd/termination",
+        "absoluteUrl": "http://localhost:18090/api/v1/resources/9acab2eb-41fe-48c9-b94e-d51571fe95cd/termination",
+        "method": "POST",
+        "clientIp": "127.0.0.1",
+        "headers": {
+          "x-correlation-id": "d76817cf-66f2-4eb0-82ae-0fb7ed4a2e9d",
+          "user-agent": "Java-http-client/21.0.12.1"
+        },
+        "cookies": {},
+        "browserProxyRequest": false,
+        "loggedDate": 1792350995821,
+        "bodyAsBase64": "",
+        "body": "",
+        "protocol": "HTTP/2.0",
+        "scheme": "http",
+        "host": "localhost",
+        "port": 18090,
+        "loggedDateString": "2026-10-18T19:16:35.821Z",
+        "queryParams": {},
+        "formParams": {}
+      },
+      "responseDefinition": {
+        "status": 202,
+        "jsonBody": {
+          "status": "TERMINATED",
+          "resourceId": "9acab2eb-41fe-48c9-b94e-d51571fe95cd"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "response": {
+        "status": 202,
+        "headers": {
+          "Content-Type": "application/json",
+          "Matched-Stub-Id": "97b416de-06f4-450a-b157-fdf5005e4d04"
+        },
+        "bodyAsBase64": "eyJzdGF0dXMiOiJURVJNSU5BVEVEIiwicmVzb3VyY2VJZCI6IjlhY2FiMmViLTQxZmUtNDhjOS1iOTRlLWQ1MTU3MWZlOTVjZCJ9",
+        "body": "{\"status\":\"TERMINATED\",\"resourceId\":\"9acab2eb-41fe-48c9-b94e-d51571fe95cd\"}"
+      },
+      "wasMatched": true,
+      "timing": {
+        "addedDelay": 0,
+        "processTime": 0,
+        "responseSendTime": 0,
+        "serveTime": 0,
+        "totalTime": 0
+      },
+      "subEvents": [],
+      "stubMapping": {
+        "id": "97b416de-06f4-450a-b157-fdf5005e4d04",
+        "request": {
+          "urlPath": "/api/v1/resources/9acab2eb-41fe-48c9-b94e-d51571fe95cd/termination",
+          "method": "POST"
+        },
+        "response": {
+          "status": 202,
+          "jsonBody": {
+            "status": "TERMINATED",
+            "resourceId": "9acab2eb-41fe-48c9-b94e-d51571fe95cd"
+          },
+          "headers": {
+            "Content-Type": "application/json"
+          }
+        },
+        "uuid": "97b416de-06f4-450a-b157-fdf5005e4d04"
+      }
+    },
+    {
+      "id": "90d8c360-48a3-40e1-9f16-fd09b1f6ddc0",
+      "request": {
+        "url": "/api/v1/resources/expired",
+        "absoluteUrl": "http://localhost:18090/api/v1/resources/expired",
+        "method": "GET",
+        "clientIp": "127.0.0.1",
+        "headers": {
+          "x-correlation-id": "d76817cf-66f2-4eb0-82ae-0fb7ed4a2e9d",
+          "user-agent": "Java-http-client/21.0.12.1"
+        },
+        "cookies": {},
+        "browserProxyRequest": false,
+        "loggedDate": 1792350995817,
+        "bodyAsBase64": "",
+        "body": "",
+        "protocol": "HTTP/2.0",
+        "scheme": "http",
+        "host": "localhost",
+        "port": 18090,
+        "loggedDateString": "2026-10-18T19:16:35.817Z",
+        "queryParams": {},
+        "formParams": {}
+      },
+      "responseDefinition": {
+        "status": 200,
+        "jsonBody": {
+          "count": 1,
+          "items": [
+            {
+              "tenantId": "u4-e2e-c61153f573834536aed139ac6f67612c",
+              "resourceId": "9acab2eb-41fe-48c9-b94e-d51571fe95cd",
+              "expiresAt": "2026-10-18T19:15:35.64922Z"
+            }
+          ]
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json",
+          "Matched-Stub-Id": "f5314119-102d-4b07-b78b-4c41055e0d5b"
+        },
+        "bodyAsBase64": "eyJjb3VudCI6MSwiaXRlbXMiOlt7InRlbmFudElkIjoidTQtZTJlLWM2MTE1M2Y1NzM4MzQ1MzZhZWQxMzlhYzZmNjc2MTJjIiwicmVzb3VyY2VJZCI6IjlhY2FiMmViLTQxZmUtNDhjOS1iOTRlLWQ1MTU3MWZlOTVjZCIsImV4cGlyZXNBdCI6IjIwMjYtMTAtMThUMTk6MTU6MzUuNjQ5MjIwMFoifV19",
+        "body": "{\"count\":1,\"items\":[{\"tenantId\":\"u4-e2e-c61153f573834536aed139ac6f67612c\",\"resourceId\":\"9acab2eb-41fe-48c9-b94e-d51571fe95cd\",\"expiresAt\":\"2026-10-18T19:15:35.6492200Z\"}]}"
+      },
+      "wasMatched": true,
+      "timing": {
+        "addedDelay": 0,
+        "processTime": 0,
+        "responseSendTime": 0,
+        "serveTime": 0,
+        "totalTime": 0
+      },
+      "subEvents": [],
+      "stubMapping": {
+        "id": "f5314119-102d-4b07-b78b-4c41055e0d5b",
+        "request": {
+          "urlPath": "/api/v1/resources/expired",
+          "method": "GET"
+        },
+        "response": {
+          "status": 200,
+          "jsonBody": {
+            "count": 1,
+            "items": [
+              {
+                "tenantId": "u4-e2e-c61153f573834536aed139ac6f67612c",
+                "resourceId": "9acab2eb-41fe-48c9-b94e-d51571fe95cd",
+                "expiresAt": "2026-10-18T19:15:35.64922Z"
+              }
+            ]
+          },
+          "headers": {
+            "Content-Type": "application/json"
+          }
+        },
+        "uuid": "f5314119-102d-4b07-b78b-4c41055e0d5b"
+      }
+    },
+    {
+      "id": "1042416a-2648-49fc-b325-4d232be6a24a",
+      "request": {
+        "url": "/api/v1/billing/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/cost?period=2026-10",
+        "absoluteUrl": "http://localhost:18090/api/v1/billing/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/cost?period=2026-10",
+        "method": "GET",
+        "clientIp": "127.0.0.1",
+        "headers": {
+          "x-correlation-id": "18325d90-21e6-4366-b7b1-33de8c1c0824",
+          "user-agent": "Java-http-client/21.0.12.1"
+        },
+        "cookies": {},
+        "browserProxyRequest": false,
+        "loggedDate": 1792350995647,
+        "bodyAsBase64": "",
+        "body": "",
+        "protocol": "HTTP/2.0",
+        "scheme": "http",
+        "host": "localhost",
+        "port": 18090,
+        "loggedDateString": "2026-10-18T19:16:35.647Z",
+        "queryParams": {
+          "period": {
+            "key": "period",
+            "values": [
+              "2026-10"
+            ]
+          }
+        },
+        "formParams": {}
+      },
+      "responseDefinition": {
+        "status": 503,
+        "jsonBody": {},
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "response": {
+        "status": 503,
+        "headers": {
+          "Content-Type": "application/json",
+          "Matched-Stub-Id": "2c2099a5-16ea-44b4-92df-1954c34c4107"
+        },
+        "bodyAsBase64": "e30=",
+        "body": "{}"
+      },
+      "wasMatched": true,
+      "timing": {
+        "addedDelay": 0,
+        "processTime": 0,
+        "responseSendTime": 0,
+        "serveTime": 0,
+        "totalTime": 0
+      },
+      "subEvents": [],
+      "stubMapping": {
+        "id": "2c2099a5-16ea-44b4-92df-1954c34c4107",
+        "request": {
+          "urlPath": "/api/v1/billing/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/cost",
+          "method": "GET"
+        },
+        "response": {
+          "status": 503,
+          "jsonBody": {},
+          "headers": {
+            "Content-Type": "application/json"
+          }
+        },
+        "uuid": "2c2099a5-16ea-44b4-92df-1954c34c4107"
+      }
+    },
+    {
+      "id": "d7e57f7f-273b-4893-bf0d-bb96148d4397",
+      "request": {
+        "url": "/api/v1/resources?tenantId=u4-e2e-c61153f573834536aed139ac6f67612c&status=ACTIVE",
+        "absoluteUrl": "http://localhost:18090/api/v1/resources?tenantId=u4-e2e-c61153f573834536aed139ac6f67612c&status=ACTIVE",
+        "method": "GET",
+        "clientIp": "127.0.0.1",
+        "headers": {
+          "x-correlation-id": "18325d90-21e6-4366-b7b1-33de8c1c0824",
+          "user-agent": "Java-http-client/21.0.12.1"
+        },
+        "cookies": {},
+        "browserProxyRequest": false,
+        "loggedDate": 1792350995645,
+        "bodyAsBase64": "",
+        "body": "",
+        "protocol": "HTTP/2.0",
+        "scheme": "http",
+        "host": "localhost",
+        "port": 18090,
+        "loggedDateString": "2026-10-18T19:16:35.645Z",
+        "queryParams": {
+          "tenantId": {
+            "key": "tenantId",
+            "values": [
+              "u4-e2e-c61153f573834536aed139ac6f67612c"
+            ]
+          },
+          "status": {
+            "key": "status",
+            "values": [
+              "ACTIVE"
+            ]
+          }
+        },
+        "formParams": {}
+      },
+      "responseDefinition": {
+        "status": 503,
+        "jsonBody": {},
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "response": {
+        "status": 503,
+        "headers": {
+          "Content-Type": "application/json",
+          "Matched-Stub-Id": "5f302966-5f7c-4fcd-a465-d8c44df2dca8"
+        },
+        "bodyAsBase64": "e30=",
+        "body": "{}"
+      },
+      "wasMatched": true,
+      "timing": {
+        "addedDelay": 0,
+        "processTime": 0,
+        "responseSendTime": 0,
+        "serveTime": 0,
+        "totalTime": 0
+      },
+      "subEvents": [],
+      "stubMapping": {
+        "id": "5f302966-5f7c-4fcd-a465-d8c44df2dca8",
+        "request": {
+          "urlPath": "/api/v1/resources",
+          "method": "GET"
+        },
+        "response": {
+          "status": 503,
+          "jsonBody": {},
+          "headers": {
+            "Content-Type": "application/json"
+          }
+        },
+        "uuid": "5f302966-5f7c-4fcd-a465-d8c44df2dca8"
+      }
+    },
+    {
+      "id": "c41bce45-c323-4251-a4ce-7cb8a8650a76",
+      "request": {
+        "url": "/api/v1/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/quota",
+        "absoluteUrl": "http://localhost:18090/api/v1/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/quota",
+        "method": "GET",
+        "clientIp": "127.0.0.1",
+        "headers": {
+          "x-correlation-id": "18325d90-21e6-4366-b7b1-33de8c1c0824",
+          "user-agent": "Java-http-client/21.0.12.1"
+        },
+        "cookies": {},
+        "browserProxyRequest": false,
+        "loggedDate": 1792350995643,
+        "bodyAsBase64": "",
+        "body": "",
+        "protocol": "HTTP/2.0",
+        "scheme": "http",
+        "host": "localhost",
+        "port": 18090,
+        "loggedDateString": "2026-10-18T19:16:35.643Z",
+        "queryParams": {},
+        "formParams": {}
+      },
+      "responseDefinition": {
+        "status": 503,
+        "jsonBody": {},
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "response": {
+        "status": 503,
+        "headers": {
+          "Content-Type": "application/json",
+          "Matched-Stub-Id": "974425c8-6694-47a0-b337-0a730cd226cc"
+        },
+        "bodyAsBase64": "e30=",
+        "body": "{}"
+      },
+      "wasMatched": true,
+      "timing": {
+        "addedDelay": 0,
+        "processTime": 0,
+        "responseSendTime": 0,
+        "serveTime": 0,
+        "totalTime": 0
+      },
+      "subEvents": [],
+      "stubMapping": {
+        "id": "974425c8-6694-47a0-b337-0a730cd226cc",
+        "request": {
+          "urlPath": "/api/v1/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/quota",
+          "method": "GET"
+        },
+        "response": {
+          "status": 503,
+          "jsonBody": {},
+          "headers": {
+            "Content-Type": "application/json"
+          }
+        },
+        "uuid": "974425c8-6694-47a0-b337-0a730cd226cc"
+      }
+    },
+    {
+      "id": "32e50507-bb23-4fc1-9493-e25c6c5fb1c3",
+      "request": {
+        "url": "/api/v1/billing/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/cost?period=2026-10",
+        "absoluteUrl": "http://localhost:18090/api/v1/billing/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/cost?period=2026-10",
+        "method": "GET",
+        "clientIp": "127.0.0.1",
+        "headers": {
+          "x-correlation-id": "1eaa7ab8-4a88-4d5b-ba53-ca125bd1ba0c",
+          "user-agent": "Java-http-client/21.0.12.1"
+        },
+        "cookies": {},
+        "browserProxyRequest": false,
+        "loggedDate": 1792350995628,
+        "bodyAsBase64": "",
+        "body": "",
+        "protocol": "HTTP/2.0",
+        "scheme": "http",
+        "host": "localhost",
+        "port": 18090,
+        "loggedDateString": "2026-10-18T19:16:35.628Z",
+        "queryParams": {
+          "period": {
+            "key": "period",
+            "values": [
+              "2026-10"
+            ]
+          }
+        },
+        "formParams": {}
+      },
+      "responseDefinition": {
+        "status": 503,
+        "jsonBody": {},
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "response": {
+        "status": 503,
+        "headers": {
+          "Content-Type": "application/json",
+          "Matched-Stub-Id": "2c2099a5-16ea-44b4-92df-1954c34c4107"
+        },
+        "bodyAsBase64": "e30=",
+        "body": "{}"
+      },
+      "wasMatched": true,
+      "timing": {
+        "addedDelay": 0,
+        "processTime": 0,
+        "responseSendTime": 0,
+        "serveTime": 0,
+        "totalTime": 0
+      },
+      "subEvents": [],
+      "stubMapping": {
+        "id": "2c2099a5-16ea-44b4-92df-1954c34c4107",
+        "request": {
+          "urlPath": "/api/v1/billing/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/cost",
+          "method": "GET"
+        },
+        "response": {
+          "status": 503,
+          "jsonBody": {},
+          "headers": {
+            "Content-Type": "application/json"
+          }
+        },
+        "uuid": "2c2099a5-16ea-44b4-92df-1954c34c4107"
+      }
+    },
+    {
+      "id": "ca8f4155-827e-4472-8756-805bbbd078c9",
+      "request": {
+        "url": "/api/v1/resources?tenantId=u4-e2e-c61153f573834536aed139ac6f67612c&status=ACTIVE",
+        "absoluteUrl": "http://localhost:18090/api/v1/resources?tenantId=u4-e2e-c61153f573834536aed139ac6f67612c&status=ACTIVE",
+        "method": "GET",
+        "clientIp": "127.0.0.1",
+        "headers": {
+          "x-correlation-id": "1eaa7ab8-4a88-4d5b-ba53-ca125bd1ba0c",
+          "user-agent": "Java-http-client/21.0.12.1"
+        },
+        "cookies": {},
+        "browserProxyRequest": false,
+        "loggedDate": 1792350995626,
+        "bodyAsBase64": "",
+        "body": "",
+        "protocol": "HTTP/2.0",
+        "scheme": "http",
+        "host": "localhost",
+        "port": 18090,
+        "loggedDateString": "2026-10-18T19:16:35.626Z",
+        "queryParams": {
+          "tenantId": {
+            "key": "tenantId",
+            "values": [
+              "u4-e2e-c61153f573834536aed139ac6f67612c"
+            ]
+          },
+          "status": {
+            "key": "status",
+            "values": [
+              "ACTIVE"
+            ]
+          }
+        },
+        "formParams": {}
+      },
+      "responseDefinition": {
+        "status": 200,
+        "jsonBody": {
+          "count": 1,
+          "items": [
+            {
+              "status": "ACTIVE",
+              "resourceId": "9acab2eb-41fe-48c9-b94e-d51571fe95cd"
+            }
+          ]
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json",
+          "Matched-Stub-Id": "5f302966-5f7c-4fcd-a465-d8c44df2dca8"
+        },
+        "bodyAsBase64": "eyJjb3VudCI6MSwiaXRlbXMiOlt7InN0YXR1cyI6IkFDVElWRSIsInJlc291cmNlSWQiOiI5YWNhYjJlYi00MWZlLTQ4YzktYjk0ZS1kNTE1NzFmZTk1Y2QifV19",
+        "body": "{\"count\":1,\"items\":[{\"status\":\"ACTIVE\",\"resourceId\":\"9acab2eb-41fe-48c9-b94e-d51571fe95cd\"}]}"
+      },
+      "wasMatched": true,
+      "timing": {
+        "addedDelay": 0,
+        "processTime": 0,
+        "responseSendTime": 0,
+        "serveTime": 0,
+        "totalTime": 0
+      },
+      "subEvents": [],
+      "stubMapping": {
+        "id": "5f302966-5f7c-4fcd-a465-d8c44df2dca8",
+        "request": {
+          "urlPath": "/api/v1/resources",
+          "method": "GET"
+        },
+        "response": {
+          "status": 200,
+          "jsonBody": {
+            "count": 1,
+            "items": [
+              {
+                "status": "ACTIVE",
+                "resourceId": "9acab2eb-41fe-48c9-b94e-d51571fe95cd"
+              }
+            ]
+          },
+          "headers": {
+            "Content-Type": "application/json"
+          }
+        },
+        "uuid": "5f302966-5f7c-4fcd-a465-d8c44df2dca8"
+      }
+    },
+    {
+      "id": "7e4bfde2-1522-45a7-942b-f31f46d812c0",
+      "request": {
+        "url": "/api/v1/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/quota",
+        "absoluteUrl": "http://localhost:18090/api/v1/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/quota",
+        "method": "GET",
+        "clientIp": "127.0.0.1",
+        "headers": {
+          "x-correlation-id": "1eaa7ab8-4a88-4d5b-ba53-ca125bd1ba0c",
+          "user-agent": "Java-http-client/21.0.12.1"
+        },
+        "cookies": {},
+        "browserProxyRequest": false,
+        "loggedDate": 1792350995625,
+        "bodyAsBase64": "",
+        "body": "",
+        "protocol": "HTTP/2.0",
+        "scheme": "http",
+        "host": "localhost",
+        "port": 18090,
+        "loggedDateString": "2026-10-18T19:16:35.625Z",
+        "queryParams": {},
+        "formParams": {}
+      },
+      "responseDefinition": {
+        "status": 200,
+        "jsonBody": {
+          "cpu": {
+            "limit": 20,
+            "remaining": 16,
+            "used": 4
+          },
+          "tenantId": "u4-e2e-c61153f573834536aed139ac6f67612c"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json",
+          "Matched-Stub-Id": "974425c8-6694-47a0-b337-0a730cd226cc"
+        },
+        "bodyAsBase64": "eyJjcHUiOnsibGltaXQiOjIwLCJyZW1haW5pbmciOjE2LCJ1c2VkIjo0fSwidGVuYW50SWQiOiJ1NC1lMmUtYzYxMTUzZjU3MzgzNDUzNmFlZDEzOWFjNmY2NzYxMmMifQ==",
+        "body": "{\"cpu\":{\"limit\":20,\"remaining\":16,\"used\":4},\"tenantId\":\"u4-e2e-c61153f573834536aed139ac6f67612c\"}"
+      },
+      "wasMatched": true,
+      "timing": {
+        "addedDelay": 0,
+        "processTime": 0,
+        "responseSendTime": 0,
+        "serveTime": 0,
+        "totalTime": 0
+      },
+      "subEvents": [],
+      "stubMapping": {
+        "id": "974425c8-6694-47a0-b337-0a730cd226cc",
+        "request": {
+          "urlPath": "/api/v1/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/quota",
+          "method": "GET"
+        },
+        "response": {
+          "status": 200,
+          "jsonBody": {
+            "cpu": {
+              "limit": 20,
+              "remaining": 16,
+              "used": 4
+            },
+            "tenantId": "u4-e2e-c61153f573834536aed139ac6f67612c"
+          },
+          "headers": {
+            "Content-Type": "application/json"
+          }
+        },
+        "uuid": "974425c8-6694-47a0-b337-0a730cd226cc"
+      }
+    },
+    {
+      "id": "64f89e7d-fd0f-49cf-922b-a522ff0ed412",
+      "request": {
+        "url": "/api/v1/billing/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/cost?period=2026-10",
+        "absoluteUrl": "http://localhost:18090/api/v1/billing/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/cost?period=2026-10",
+        "method": "GET",
+        "clientIp": "127.0.0.1",
+        "headers": {
+          "Connection": "Upgrade, HTTP2-Settings",
+          "Host": "localhost:18090",
+          "HTTP2-Settings": "AAEAAEAAAAIAAAAAAAMAAAAAAAQBAAAAAAUAAEAAAAYABgAA",
+          "Upgrade": "h2c",
+          "User-Agent": "Java-http-client/21.0.12.1",
+          "X-Correlation-Id": "48cf2bd8-4a38-4b21-b85a-3704a228f08c"
+        },
+        "cookies": {},
+        "browserProxyRequest": false,
+        "loggedDate": 1792350995613,
+        "bodyAsBase64": "",
+        "body": "",
+        "protocol": "HTTP/1.1",
+        "scheme": "http",
+        "host": "localhost",
+        "port": 18090,
+        "loggedDateString": "2026-10-18T19:16:35.613Z",
+        "queryParams": {
+          "period": {
+            "key": "period",
+            "values": [
+              "2026-10"
+            ]
+          }
+        },
+        "formParams": {}
+      },
+      "responseDefinition": {
+        "status": 200,
+        "jsonBody": {
+          "amount": "0.0000",
+          "currency": "USD"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json",
+          "Matched-Stub-Id": "2c2099a5-16ea-44b4-92df-1954c34c4107"
+        },
+        "bodyAsBase64": "eyJhbW91bnQiOiIwLjAwMDAiLCJjdXJyZW5jeSI6IlVTRCJ9",
+        "body": "{\"amount\":\"0.0000\",\"currency\":\"USD\"}"
+      },
+      "wasMatched": true,
+      "timing": {
+        "addedDelay": 0,
+        "processTime": 0,
+        "responseSendTime": 0,
+        "serveTime": 0,
+        "totalTime": 0
+      },
+      "subEvents": [],
+      "stubMapping": {
+        "id": "2c2099a5-16ea-44b4-92df-1954c34c4107",
+        "request": {
+          "urlPath": "/api/v1/billing/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/cost",
+          "method": "GET"
+        },
+        "response": {
+          "status": 200,
+          "jsonBody": {
+            "amount": "0.0000",
+            "currency": "USD"
+          },
+          "headers": {
+            "Content-Type": "application/json"
+          }
+        },
+        "uuid": "2c2099a5-16ea-44b4-92df-1954c34c4107"
+      }
+    },
+    {
+      "id": "d4bd442d-544f-4d5b-8d27-5ff0c623aa64",
+      "request": {
+        "url": "/api/v1/resources?tenantId=u4-e2e-c61153f573834536aed139ac6f67612c&status=ACTIVE",
+        "absoluteUrl": "http://localhost:18090/api/v1/resources?tenantId=u4-e2e-c61153f573834536aed139ac6f67612c&status=ACTIVE",
+        "method": "GET",
+        "clientIp": "127.0.0.1",
+        "headers": {
+          "Connection": "Upgrade, HTTP2-Settings",
+          "Host": "localhost:18090",
+          "HTTP2-Settings": "AAEAAEAAAAIAAAAAAAMAAAAAAAQBAAAAAAUAAEAAAAYABgAA",
+          "Upgrade": "h2c",
+          "User-Agent": "Java-http-client/21.0.12.1",
+          "X-Correlation-Id": "48cf2bd8-4a38-4b21-b85a-3704a228f08c"
+        },
+        "cookies": {},
+        "browserProxyRequest": false,
+        "loggedDate": 1792350995610,
+        "bodyAsBase64": "",
+        "body": "",
+        "protocol": "HTTP/1.1",
+        "scheme": "http",
+        "host": "localhost",
+        "port": 18090,
+        "loggedDateString": "2026-10-18T19:16:35.61Z",
+        "queryParams": {
+          "tenantId": {
+            "key": "tenantId",
+            "values": [
+              "u4-e2e-c61153f573834536aed139ac6f67612c"
+            ]
+          },
+          "status": {
+            "key": "status",
+            "values": [
+              "ACTIVE"
+            ]
+          }
+        },
+        "formParams": {}
+      },
+      "responseDefinition": {
+        "status": 200,
+        "jsonBody": {
+          "count": 1,
+          "items": [
+            {
+              "status": "ACTIVE",
+              "resourceId": "9acab2eb-41fe-48c9-b94e-d51571fe95cd"
+            }
+          ]
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json",
+          "Matched-Stub-Id": "5f302966-5f7c-4fcd-a465-d8c44df2dca8"
+        },
+        "bodyAsBase64": "eyJjb3VudCI6MSwiaXRlbXMiOlt7InN0YXR1cyI6IkFDVElWRSIsInJlc291cmNlSWQiOiI5YWNhYjJlYi00MWZlLTQ4YzktYjk0ZS1kNTE1NzFmZTk1Y2QifV19",
+        "body": "{\"count\":1,\"items\":[{\"status\":\"ACTIVE\",\"resourceId\":\"9acab2eb-41fe-48c9-b94e-d51571fe95cd\"}]}"
+      },
+      "wasMatched": true,
+      "timing": {
+        "addedDelay": 0,
+        "processTime": 0,
+        "responseSendTime": 0,
+        "serveTime": 0,
+        "totalTime": 0
+      },
+      "subEvents": [],
+      "stubMapping": {
+        "id": "5f302966-5f7c-4fcd-a465-d8c44df2dca8",
+        "request": {
+          "urlPath": "/api/v1/resources",
+          "method": "GET"
+        },
+        "response": {
+          "status": 200,
+          "jsonBody": {
+            "count": 1,
+            "items": [
+              {
+                "status": "ACTIVE",
+                "resourceId": "9acab2eb-41fe-48c9-b94e-d51571fe95cd"
+              }
+            ]
+          },
+          "headers": {
+            "Content-Type": "application/json"
+          }
+        },
+        "uuid": "5f302966-5f7c-4fcd-a465-d8c44df2dca8"
+      }
+    },
+    {
+      "id": "1d4d9c19-a79c-440e-aebb-ce832fdab43e",
+      "request": {
+        "url": "/api/v1/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/quota",
+        "absoluteUrl": "http://localhost:18090/api/v1/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/quota",
+        "method": "GET",
+        "clientIp": "127.0.0.1",
+        "headers": {
+          "Connection": "Upgrade, HTTP2-Settings",
+          "Host": "localhost:18090",
+          "HTTP2-Settings": "AAEAAEAAAAIAAAAAAAMAAAAAAAQBAAAAAAUAAEAAAAYABgAA",
+          "Upgrade": "h2c",
+          "User-Agent": "Java-http-client/21.0.12.1",
+          "X-Correlation-Id": "48cf2bd8-4a38-4b21-b85a-3704a228f08c"
+        },
+        "cookies": {},
+        "browserProxyRequest": false,
+        "loggedDate": 1792350995593,
+        "bodyAsBase64": "",
+        "body": "",
+        "protocol": "HTTP/1.1",
+        "scheme": "http",
+        "host": "localhost",
+        "port": 18090,
+        "loggedDateString": "2026-10-18T19:16:35.593Z",
+        "queryParams": {},
+        "formParams": {}
+      },
+      "responseDefinition": {
+        "status": 200,
+        "jsonBody": {
+          "cpu": {
+            "limit": 20,
+            "remaining": 16,
+            "used": 4
+          },
+          "tenantId": "u4-e2e-c61153f573834536aed139ac6f67612c"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json",
+          "Matched-Stub-Id": "974425c8-6694-47a0-b337-0a730cd226cc"
+        },
+        "bodyAsBase64": "eyJjcHUiOnsibGltaXQiOjIwLCJyZW1haW5pbmciOjE2LCJ1c2VkIjo0fSwidGVuYW50SWQiOiJ1NC1lMmUtYzYxMTUzZjU3MzgzNDUzNmFlZDEzOWFjNmY2NzYxMmMifQ==",
+        "body": "{\"cpu\":{\"limit\":20,\"remaining\":16,\"used\":4},\"tenantId\":\"u4-e2e-c61153f573834536aed139ac6f67612c\"}"
+      },
+      "wasMatched": true,
+      "timing": {
+        "addedDelay": 0,
+        "processTime": 0,
+        "responseSendTime": 0,
+        "serveTime": 0,
+        "totalTime": 0
+      },
+      "subEvents": [],
+      "stubMapping": {
+        "id": "974425c8-6694-47a0-b337-0a730cd226cc",
+        "request": {
+          "urlPath": "/api/v1/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/quota",
+          "method": "GET"
+        },
+        "response": {
+          "status": 200,
+          "jsonBody": {
+            "cpu": {
+              "limit": 20,
+              "remaining": 16,
+              "used": 4
+            },
+            "tenantId": "u4-e2e-c61153f573834536aed139ac6f67612c"
+          },
+          "headers": {
+            "Content-Type": "application/json"
+          }
+        },
+        "uuid": "974425c8-6694-47a0-b337-0a730cd226cc"
+      }
+    },
+    {
+      "id": "3bf16a3e-ad52-4805-84da-d8d426bda6c9",
+      "request": {
+        "url": "/api/v1/resources/expired",
+        "absoluteUrl": "http://localhost:18090/api/v1/resources/expired",
+        "method": "GET",
+        "clientIp": "127.0.0.1",
+        "headers": {
+          "x-correlation-id": "fdef24ca-d614-4deb-a159-df18e43e6943",
+          "user-agent": "Java-http-client/21.0.12.1"
+        },
+        "cookies": {},
+        "browserProxyRequest": false,
+        "loggedDate": 1792350995304,
+        "bodyAsBase64": "",
+        "body": "",
+        "protocol": "HTTP/2.0",
+        "scheme": "http",
+        "host": "localhost",
+        "port": 18090,
+        "loggedDateString": "2026-10-18T19:16:35.304Z",
+        "queryParams": {},
+        "formParams": {}
+      },
+      "responseDefinition": {
+        "status": 200,
+        "jsonBody": {
+          "count": 0,
+          "items": []
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json",
+          "Matched-Stub-Id": "f5314119-102d-4b07-b78b-4c41055e0d5b"
+        },
+        "bodyAsBase64": "eyJjb3VudCI6MCwiaXRlbXMiOltdfQ==",
+        "body": "{\"count\":0,\"items\":[]}"
+      },
+      "wasMatched": true,
+      "timing": {
+        "addedDelay": 0,
+        "processTime": 0,
+        "responseSendTime": 0,
+        "serveTime": 0,
+        "totalTime": 0
+      },
+      "subEvents": [],
+      "stubMapping": {
+        "id": "f5314119-102d-4b07-b78b-4c41055e0d5b",
+        "request": {
+          "urlPath": "/api/v1/resources/expired",
+          "method": "GET"
+        },
+        "response": {
+          "status": 200,
+          "jsonBody": {
+            "count": 0,
+            "items": []
+          },
+          "headers": {
+            "Content-Type": "application/json"
+          }
+        },
+        "uuid": "f5314119-102d-4b07-b78b-4c41055e0d5b"
+      }
+    },
+    {
+      "id": "000dbfdd-9b01-4d4e-b334-67c1e980d42b",
+      "request": {
+        "url": "/api/v1/resources/expired",
+        "absoluteUrl": "http://localhost:18090/api/v1/resources/expired",
+        "method": "GET",
+        "clientIp": "127.0.0.1",
+        "headers": {
+          "Connection": "Upgrade, HTTP2-Settings",
+          "Host": "localhost:18090",
+          "HTTP2-Settings": "AAEAAEAAAAIAAAAAAAMAAAAAAAQBAAAAAAUAAEAAAAYABgAA",
+          "Upgrade": "h2c",
+          "User-Agent": "Java-http-client/21.0.12.1",
+          "X-Correlation-Id": "6e0680eb-19c2-4985-b915-b26ae1f9792d"
+        },
+        "cookies": {},
+        "browserProxyRequest": false,
+        "loggedDate": 1792350994759,
+        "bodyAsBase64": "",
+        "body": "",
+        "protocol": "HTTP/1.1",
+        "scheme": "http",
+        "host": "localhost",
+        "port": 18090,
+        "loggedDateString": "2026-10-18T19:16:34.759Z",
+        "queryParams": {},
+        "formParams": {}
+      },
+      "responseDefinition": {
+        "status": 200,
+        "jsonBody": {
+          "count": 0,
+          "items": []
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json",
+          "Matched-Stub-Id": "f5314119-102d-4b07-b78b-4c41055e0d5b"
+        },
+        "bodyAsBase64": "eyJjb3VudCI6MCwiaXRlbXMiOltdfQ==",
+        "body": "{\"count\":0,\"items\":[]}"
+      },
+      "wasMatched": true,
+      "timing": {
+        "addedDelay": 0,
+        "processTime": 0,
+        "responseSendTime": 0,
+        "serveTime": 0,
+        "totalTime": 0
+      },
+      "subEvents": [],
+      "stubMapping": {
+        "id": "f5314119-102d-4b07-b78b-4c41055e0d5b",
+        "request": {
+          "urlPath": "/api/v1/resources/expired",
+          "method": "GET"
+        },
+        "response": {
+          "status": 200,
+          "jsonBody": {
+            "count": 0,
+            "items": []
+          },
+          "headers": {
+            "Content-Type": "application/json"
+          }
+        },
+        "uuid": "f5314119-102d-4b07-b78b-4c41055e0d5b"
+      }
+    }
+  ],
+  "meta": {
+    "total": 13
+  },
+  "requestJournalDisabled": false
+}

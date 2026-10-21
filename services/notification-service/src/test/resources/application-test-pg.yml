@@ -1,0 +1,10 @@
+spring:
+  datasource:
+    url: ${U4_TEST_DB_URL:jdbc:postgresql://localhost:5432/notification_u4_test}
+    username: ${U4_TEST_DB_USER:notification_test_user}
+    password: ${U4_TEST_DB_PASSWORD:changeme}
+notification:
+  delivery:
+    max-attempts: 3
+    failure-rate: 0.0
+    retry-interval-ms: 100

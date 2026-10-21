@@ -1,0 +1,9 @@
+U4 isolated database failure check 2026-10-18T19:18:11.525451+00:00
+COMMAND: java -jar services/notification/target/notification.jar (dedicated port 18184 and isolated PostgreSQL on 55434)
+PASS: actual Notification process and PostgreSQL are healthy
+COMMAND: pg_ctl -D <isolated U4 temp cluster> stop -m fast
+POST /api/v1/notifications -> 503 {"type": "https://crm.example/errors/notification-unavailable", "title": "Service Unavailable", "status": 503, "detail": "Service Unavailable", "instance": "/api/v1/notifications", "code": "NOTIFICATION_UNAVAILABLE", "correlationId": "u4-db-outage", "timestamp": "2026-10-18T19:18:13.829155Z"}
+GET /health -> 503 DOWN
+PASS: database restart restores health; failed POST persisted no event
+PASS: Notification E2E role cannot connect to the separate test database
+RESULT: database outage, recovery, acceptance safety and database isolation passed

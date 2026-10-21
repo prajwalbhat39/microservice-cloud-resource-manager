@@ -1,0 +1,57 @@
+**********************
+PowerShell transcript start
+Start time: 20261019004630
+Username: D5D0Ds\d5d0ds
+RunAs User: D5D0Ds\d5d0ds
+Configuration Name: 
+Machine: D5D0Ds (Unix 27.0.1)
+Host Application: /private/tmp/crm-u4-tools/pwsh/pwsh.dll -NoProfile -File scripts/u4/e2e.ps1 -SkipBuild -DbHost 127.0.0.1 -DbPort 55434 -DbName notification_u4_e2e -DbUser notification_e2e_user
+Process ID: 9491
+PSVersion: 7.6.7
+PSEdition: Core
+GitCommitId: 7.6.7
+OS: macOS 27.0.1
+Platform: Unix
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1, 6.0, 7.0
+PSRemotingProtocolVersion: 2.4
+SerializationVersion: 1.1.0.1
+WSManStackVersion: 3.0
+**********************
+U4 process E2E 2026-10-18T19:16:30.7262870Z
+Scope: three actual U4 jars, PostgreSQL, and WireMock peers. This is not the full-team provisioning saga.
+COMMAND: pwsh scripts/u4/e2e.ps1 -SkipBuild:True -DbHost 127.0.0.1 -DbPort 55434 -DbName notification_u4_e2e -DbUser notification_e2e_user
+[INFO] Scanning for projects...
+[INFO]
+[INFO] ----------------------< com.crm:usage-aggregator >----------------------
+[INFO] Building usage-aggregator 1.0.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- dependency:3.8.1:copy-dependencies (default-cli) @ usage-aggregator ---
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  0.433 s
+[INFO] Finished at: 2026-10-19T00:46:31+05:30
+[INFO] ------------------------------------------------------------------------
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+PASS: lifecycle acceptance, persisted notification, composition and available zero cost
+PASS: billing outage degrades only the cost section
+PASS: total upstream outage still returns explicit availability
+PASS: actual scheduled expiry invokes the orchestrator contract; all three lifecycle events persisted
+PASS: exported runtime OpenAPI specifications and captured correlated peer HTTP requests
+RESULT: U4 process end-to-end checks passed
+**********************
+PowerShell transcript end
+End time: 20261019004636
+**********************
