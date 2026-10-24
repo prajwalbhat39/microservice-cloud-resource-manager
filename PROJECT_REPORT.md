@@ -242,7 +242,55 @@ If quota is rejected, Resource returns the corresponding 404/422 synchronously a
 
 **Failure-path qualification:** the captured compensation demonstration used a real Resource service, real Quota service, real PostgreSQL, and stubbed Provider/Billing/Notification. The diagram expresses the workflow; it is not evidence of an all-real-services failure test.
 
-### 3.3 Lifecycle and termination
+### 3.3 Failure sequence: Billing failure and saga compensation
+
+This standalone failure diagram makes the required failure path explicit. Step 1 (quota reservation) and step 2 (provider provisioning) succeed, but step 3 (billing start) returns 503 on all three attempts. Step 4 (activation) is never executed. The orchestrator then compensates the completed steps in reverse order: terminate the provider instance, then release quota.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor C as Client
+    participant R as Resource API / Saga
+    participant D as resource_db
+    participant Q as Quota
+    participant P as Provider Mock
+    participant B as Billing
+    participant N as Notification
+    C->>R: POST /api/v1/resources + Idempotency-Key
+    R->>D: Claim key and store request fingerprint
+    R->>Q: Step 1 - POST /api/v1/quota/reservations
+    Q-->>R: 200 RESERVED
+    R->>D: Save REQUESTED resource, PENDING reservation, cached 202
+    R->>D: Commit; dispatch saga after commit
+    R-->>C: 202 Accepted + reservation Location
+    R->>D: Transition resource to PROVISIONING
+    R->>P: Step 2 - POST /api/v1/provider/instances (stable token)
+    P-->>R: 201 Created + instanceId
+    R->>D: Store provider_instance_id
+    loop Three total billing attempts
+        R->>B: Step 3 - POST /api/v1/billing/meters
+        B-->>R: 503 Service Unavailable
+        Note over R,B: Backoff with jitter between attempts only
+    end
+    Note over R,D: Retries exhausted; step 4 (activation) is skipped
+    Note over R,B: Meter never started; no billing stop is needed
+    R->>P: Compensate step 2 - DELETE /api/v1/provider/instances/{id}
+    P-->>R: 200 TERMINATED
+    R->>D: Clear provider_instance_id
+    R->>Q: Compensate step 1 - POST /api/v1/quota/reservations/{resourceId}/release
+    Q-->>R: 200 RELEASED; restore reserved capacity once
+    R->>D: Resource FAILED; reservation FAILED; save BILLING_UNAVAILABLE reason
+    R->>N: POST /api/v1/notifications (FAILED; best effort)
+    N-->>R: 202 Accepted in the demonstrated scenario
+    C->>R: GET /api/v1/reservations/{reservationId}
+    R-->>C: 200 OK; status FAILED + failureReason
+```
+
+**Outcome:** in the recorded scenario, the created provider instance is terminated, quota is returned in full, and the resource and reservation are FAILED. The client sees the failure through polling; the earlier 202 only acknowledged acceptance. A failed notification does not restart compensation.
+
+**Evidence and scope:** the [downstream call journal](https://github.com/prajwalbhat39/microservice-cloud-resource-manager/blob/main/evidence/challenge-3c-saga-compensation/peer-calls.txt) records the three Billing 503 responses and subsequent provider DELETE; the [final database state](https://github.com/prajwalbhat39/microservice-cloud-resource-manager/blob/main/evidence/challenge-3c-saga-compensation/db-after.txt) records quota release and FAILED outcomes. Provider, Billing, and Notification were stubbed in this run. This diagram assumes the compensating calls succeed, as in that demonstration; compensation outages and the real Billing failure-injection mismatch remain limitations described in Sections 6 and 9.
+
+### 3.4 Lifecycle and termination
 
 ```mermaid
 stateDiagram-v2
@@ -259,7 +307,7 @@ stateDiagram-v2
 
 Termination uses an atomic `ACTIVE -> TERMINATED` update to select one winner. After commit, teardown calls Provider termination, Billing stop, Quota release, and Notification in that order. Failed steps are logged and subsequent steps continue. The status changes before cleanup completes, so `TERMINATED` currently describes the accepted desired state rather than verified completion of every remote effect.
 
-### 3.4 Runtime and observability
+### 3.5 Runtime and observability
 
 Core clients have connect/read timeouts and bounded retry with exponential backoff and jitter. Defaults are three attempts, 200 ms initial backoff, multiplier 2, configured pre-jitter cap 2,000 ms, and jitter ratio 0.5. Because jitter is applied after capping, the final delay can exceed that pre-jitter cap. HTTP 503 and supported transport failures are retryable; ordinary business rejections are not.
 
