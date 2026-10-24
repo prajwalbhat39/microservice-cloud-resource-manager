@@ -8,11 +8,14 @@ Everything here was produced by actually running the services and the scripts; t
 `output.txt`, `db-*.txt`, `*-logs.txt` and `*-tests.txt` files are captured console
 and database output, reproduced verbatim.
 
-> **Scope.** U1 is two of the system's five services. These two carry all three graded
-> challenges and business rules BR1-BR7. The Provider, Billing and Notification services
-> (owned by other team members) are not built yet; during U1 they are stood in by
-> `../scripts/peer-stub.py`. See `challenge-3c-saga-compensation/NOTE.md` for exactly
-> what that substitution does and does not prove.
+> **Scope.** U1 is the Quota and Resource/orchestrator services — two of the system's seven.
+> These two carry all three graded challenges and business rules BR1-BR7. As of the first full
+> seven-service integration run (2026-10-24), the Provider, Billing and Notification services
+> (owned by other team members) are **built and running**, and the evidence below was
+> recaptured against those **real services** — not the peer stub. `../scripts/peer-stub.py`
+> remains only as the `-Core` fallback for running U1 in isolation. See
+> `challenge-3c-saga-compensation/NOTE.md` for the per-service breakdown and the one contract
+> bug the integration run uncovered and fixed (Finding 5).
 
 ---
 
@@ -43,22 +46,29 @@ the compensated transaction), `peer-calls.txt` (the downstream call journal), an
 
 ## Prerequisites
 
-1. **PostgreSQL** reachable on `localhost:5432`, with the two databases and least-privilege
-   users created by `../scripts/db/setup-u1.sql` (`quota_db`/`quota_user`, `resource_db`/`resource_user`,
-   password `changeme`). The scripts set `PGPASSWORD` themselves.
-2. **The Quota service** on `:8081` and **the Resource service** on `:8082`:
+1. **PostgreSQL** reachable on `localhost:5432`, with all five databases and least-privilege
+   users created by the two setup scripts (run once as the postgres superuser):
    ```powershell
-   java -jar services/quota/target/quota-service-1.0.0-SNAPSHOT.jar
-   java -jar services/resource/target/resource-service-1.0.0-SNAPSHOT.jar
+   psql -U postgres -h localhost -f ../scripts/db/setup-u1.sql      # quota_db, resource_db
+   psql -U postgres -h localhost -f ../scripts/db/setup-u2-u4.sql   # billing_db, provider_db, notification_db
    ```
-   (or `./mvnw spring-boot:run` in each service folder). Each service runs Flyway on
-   startup, so the tables are created automatically on first boot.
-3. **The peer stub** on `:8090`, standing in for Provider/Billing/Notification:
+   All users are `<svc>_user` / password `changeme`; the evidence scripts set `PGPASSWORD`
+   themselves.
+2. **All services running.** The simplest way is the demo launcher, which starts every service
+   in its own window with demo-safe settings and waits for health:
    ```powershell
-   python scripts/peer-stub.py
+   ../scripts/demo/start-all.ps1
    ```
-   Needed for Challenge 2 and Challenge 3C (the provisioning saga calls these peers).
-   Challenge 1 does not need it (Quota has no downstream peers).
+   Each service runs Flyway on startup, so tables are created automatically on first boot.
+   Challenge 1 only needs Quota (`:8081`); Challenges 2 and 3C drive the full saga and so need
+   the Resource orchestrator plus the real Provider (`:8085`), Billing (`:8083`) and
+   Notification (`:8084`).
+3. **U1-only fallback (optional).** To run the two U1 services in isolation without the U2/U3/U4
+   databases, use the peer stub instead of the real services:
+   ```powershell
+   ../scripts/demo/start-all.ps1 -Core     # quota + resource + scripts/peer-stub.py on :8090
+   ```
+   The challenge scripts behave identically; only the peer identity differs.
 4. **PowerShell 7+** (`ForEach-Object -Parallel` is used for the genuinely-concurrent
    cases in Challenges 1 and 2) and **Docker** (only for the Testcontainers integration
    tests under `unit-and-integration-tests/`, not for the challenge scripts).
@@ -117,7 +127,7 @@ honest about what is and is not covered in U1.
 | **BR2** | Provisioning is idempotent; same key + same payload replays, no extra effect | Challenge 2 script (sequential replay + 10-way concurrent) **and** `IdempotencyServiceTest`, `IdempotencyReplayTest`, `IdempotencyConcurrencyIT` | `challenge-2-idempotency/`, `unit-and-integration-tests/resource-tests.txt` |
 | **BR3** | Same key + different payload is rejected with 422 | Challenge 2 script (mismatch case) **and** `RequestFingerprintTest`, `IdempotencyPayloadMismatchIT` | `challenge-2-idempotency/`, `unit-and-integration-tests/resource-tests.txt` |
 | **BR4** | A resource follows only the defined lifecycle graph; ACTIVE only from PROVISIONING | `ResourceLifecycleTest` (unit, TR-2) | `unit-and-integration-tests/resource-tests.txt` |
-| **BR5** | A billing meter stops on termination and accrues nothing after | **NOT YET** - belongs to the Billing service, which is not built in U1. Owned by the core owner but out of U1 scope. | pending |
+| **BR5** | A billing meter stops on termination and accrues nothing after | Now covered in the **Billing service's own unit** by `br5_billingStopsWhenResourceIsTerminated_idempotentStop` (asserts the idempotent stop and that no further cost accrues). It is a rule about Billing's internal state, so it lives in U2's evidence, not U1's. | `services/billing-service` tests (U2) |
 | **BR6** | Saga compensation releases reserved quota in full | Challenge 3C script **and** `ProvisioningSagaCompensationTest` | `challenge-3c-saga-compensation/`, `unit-and-integration-tests/resource-tests.txt` |
 | **BR7** | A resource's quota is released exactly once | Challenge 3C script (ledger RELEASED) **and** `Br7ReleaseExactlyOnceIT`, `TerminationIdempotencyIT` | `challenge-3c-saga-compensation/`, `unit-and-integration-tests/` |
 | **BR8** | A FREE-tier tenant cannot provision a CLUSTER | `TierPolicyTest` (unit, TR-2); also shown as a failure case in the Challenge 1 script | `unit-and-integration-tests/quota-tests.txt`, `challenge-1-quota-concurrency/output.txt` |
@@ -128,8 +138,9 @@ honest about what is and is not covered in U1.
   script exercises BR8 as a bonus failure case, but the authoritative proof is `TierPolicyTest`.
   No challenge script exercises an illegal lifecycle transition; `ResourceLifecycleTest` is the
   proof for BR4.
-- **BR5** is genuinely not covered anywhere yet, because the Billing service does not exist in
-  U1. It is listed here rather than quietly omitted.
+- **BR5** is now covered by the Billing service's own test (`br5_billingStopsWhenResourceIsTerminated_idempotentStop`),
+  verified once that service was built for the integration run. It is Billing's rule, so the proof
+  lives in U2's evidence rather than here — not in U1's challenge scripts.
 - Each challenge folder also includes at least one **failure case** (ER-4 / TR-10): Challenge 1
   rejects an over-limit FREE tenant; Challenge 2 rejects a changed-payload key reuse; Challenge
   3C is itself a forced-failure-and-recovery scenario, shown alongside the happy path for contrast.
