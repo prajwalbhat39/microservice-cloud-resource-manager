@@ -59,9 +59,15 @@ springdoc:
     path: /swagger-ui.html
 
 # ---------------------------------------------------------------------
-# Peer base URLs. During U1, Provider/Billing/Notification point at
-# WireMock (one standalone process, infrastructure-design.md 8) on 8090.
-# Quota is real and lives at its own port.
+# Peer base URLs. These now default to the REAL services' own ports
+# (units.md 8): quota 8081, billing 8083, notification 8084, provider 8085.
+#
+# To run the orchestrator against the local stand-in instead (scripts/peer-stub.py,
+# which answers for all three of provider/billing/notification on one port), point
+# them there explicitly, e.g.:
+#   $env:PROVIDER_SERVICE_URL     = 'http://localhost:8090'
+#   $env:BILLING_SERVICE_URL      = 'http://localhost:8090'
+#   $env:NOTIFICATION_SERVICE_URL = 'http://localhost:8090'
 # ---------------------------------------------------------------------
 peers:
   quota:
@@ -69,15 +75,15 @@ peers:
     connect-timeout-ms: ${QUOTA_CONNECT_TIMEOUT_MS:2000}
     read-timeout-ms: ${QUOTA_READ_TIMEOUT_MS:2000}
   provider:
-    base-url: ${PROVIDER_SERVICE_URL:http://localhost:8090}
+    base-url: ${PROVIDER_SERVICE_URL:http://localhost:8085}
     connect-timeout-ms: ${PROVIDER_CONNECT_TIMEOUT_MS:2000}
     read-timeout-ms: ${PROVIDER_READ_TIMEOUT_MS:10000}
   billing:
-    base-url: ${BILLING_SERVICE_URL:http://localhost:8090}
+    base-url: ${BILLING_SERVICE_URL:http://localhost:8083}
     connect-timeout-ms: ${BILLING_CONNECT_TIMEOUT_MS:2000}
     read-timeout-ms: ${BILLING_READ_TIMEOUT_MS:3000}
   notification:
-    base-url: ${NOTIFICATION_SERVICE_URL:http://localhost:8090}
+    base-url: ${NOTIFICATION_SERVICE_URL:http://localhost:8084}
     connect-timeout-ms: ${NOTIFICATION_CONNECT_TIMEOUT_MS:2000}
     read-timeout-ms: ${NOTIFICATION_READ_TIMEOUT_MS:2000}
 

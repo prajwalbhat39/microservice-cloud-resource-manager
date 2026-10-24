@@ -1,0 +1,304 @@
+openapi: 3.1.0
+info:
+  title: Quota Service API
+  description: "Tenants, tiers and the quota reservation ledger. Challenge 1 (concurrency)."
+  version: v1
+servers:
+- url: http://localhost:8081
+  description: Generated server url
+paths:
+  /api/v1/tenants:
+    post:
+      tags:
+      - tenant-controller
+      summary: Create a tenant (FR-1)
+      operationId: create
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTenantRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/TenantResponse"
+        "400":
+          description: VALIDATION_FAILED
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/TenantResponse"
+        "409":
+          description: TENANT_ALREADY_EXISTS
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/TenantResponse"
+        "422":
+          description: INVALID_TIER
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/TenantResponse"
+  /api/v1/quota/reservations:
+    post:
+      tags:
+      - quota-controller
+      summary: "Reserve quota atomically (FR-7, Challenge 1)"
+      operationId: reserve
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReserveQuotaRequest"
+        required: true
+      responses:
+        "200":
+          description: Reserved (or replayed)
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ReserveQuotaResponse"
+        "400":
+          description: VALIDATION_FAILED
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ReserveQuotaResponse"
+        "404":
+          description: TENANT_NOT_FOUND
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ReserveQuotaResponse"
+        "409":
+          description: QUOTA_RESERVATION_ALREADY_RELEASED
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ReserveQuotaResponse"
+        "422":
+          description: QUOTA_EXCEEDED or TIER_FORBIDS_RESOURCE_TYPE
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ReserveQuotaResponse"
+  /api/v1/quota/reservations/{resourceId}/release:
+    post:
+      tags:
+      - quota-controller
+      summary: "Release a resource's quota exactly once (FR-8, BR7)"
+      operationId: release
+      parameters:
+      - name: resourceId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Released (or no-op replay)
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ReleaseQuotaResponse"
+        "404":
+          description: QUOTA_RESERVATION_NOT_FOUND
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ReleaseQuotaResponse"
+  /api/v1/tenants/{tenantId}:
+    get:
+      tags:
+      - tenant-controller
+      summary: Read a tenant and its tier limits (FR-2)
+      operationId: get
+      parameters:
+      - name: tenantId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/TenantResponse"
+        "404":
+          description: TENANT_NOT_FOUND
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/TenantResponse"
+  /api/v1/tenants/{tenantId}/quota:
+    get:
+      tags:
+      - tenant-controller
+      summary: Current usage and headroom (FR-9)
+      operationId: quota
+      parameters:
+      - name: tenantId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/QuotaUsageResponse"
+        "404":
+          description: TENANT_NOT_FOUND
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/QuotaUsageResponse"
+components:
+  schemas:
+    CreateTenantRequest:
+      type: object
+      properties:
+        tenantId:
+          type: string
+          maxLength: 64
+          minLength: 0
+          pattern: "^[a-z0-9][a-z0-9-]{1,63}$"
+        name:
+          type: string
+          maxLength: 200
+          minLength: 0
+        tier:
+          type: string
+          minLength: 1
+    Limits:
+      type: object
+      properties:
+        cpu:
+          type: integer
+          format: int32
+        ramGb:
+          type: integer
+          format: int32
+        instances:
+          type: integer
+          format: int32
+    TenantResponse:
+      type: object
+      properties:
+        tenantId:
+          type: string
+        name:
+          type: string
+        tier:
+          type: string
+        limits:
+          $ref: "#/components/schemas/Limits"
+        createdAt:
+          type: string
+          format: date-time
+    ReserveQuotaRequest:
+      type: object
+      properties:
+        tenantId:
+          type: string
+          maxLength: 64
+          minLength: 0
+        resourceId:
+          type: string
+          maxLength: 64
+          minLength: 0
+        type:
+          type: string
+          minLength: 1
+        cpu:
+          type: integer
+          format: int32
+          maximum: 256
+          minimum: 1
+        ramGb:
+          type: integer
+          format: int32
+          maximum: 2048
+          minimum: 1
+      required:
+      - cpu
+      - ramGb
+    DimensionView:
+      type: object
+      properties:
+        limit:
+          type: integer
+          format: int32
+        used:
+          type: integer
+          format: int32
+        remaining:
+          type: integer
+          format: int32
+    ReserveQuotaResponse:
+      type: object
+      properties:
+        reservationId:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+        resourceId:
+          type: string
+        state:
+          type: string
+        cpu:
+          type: integer
+          format: int32
+        ramGb:
+          type: integer
+          format: int32
+        replay:
+          type: boolean
+        usage:
+          $ref: "#/components/schemas/UsageView"
+    UsageView:
+      type: object
+      properties:
+        cpu:
+          $ref: "#/components/schemas/DimensionView"
+        ramGb:
+          $ref: "#/components/schemas/DimensionView"
+        instances:
+          $ref: "#/components/schemas/DimensionView"
+    ReleaseQuotaResponse:
+      type: object
+      properties:
+        resourceId:
+          type: string
+        state:
+          type: string
+        released:
+          type: boolean
+        releasedAt:
+          type: string
+          format: date-time
+        usage:
+          $ref: "#/components/schemas/UsageView"
+    QuotaUsageResponse:
+      type: object
+      properties:
+        tenantId:
+          type: string
+        tier:
+          type: string
+        cpu:
+          $ref: "#/components/schemas/DimensionView"
+        ramGb:
+          $ref: "#/components/schemas/DimensionView"
+        instances:
+          $ref: "#/components/schemas/DimensionView"

@@ -1,5 +1,8 @@
 server:
-  port: 8083
+  # Env-var with a local default, like every other value here and in every other
+  # service (NFR-18, NFR-19). A hardcoded port cannot be moved for Assignment 2's
+  # containerisation without a code change.
+  port: ${SERVER_PORT:8083}
 
 spring:
   application:

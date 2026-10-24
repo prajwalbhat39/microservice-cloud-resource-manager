@@ -1,24 +1,24 @@
 =============================================================================
 CHALLENGE 2 EVIDENCE - BR2 (idempotent replay) and BR3 (payload mismatch)
 =============================================================================
-Run (UTC)        : 2026-10-20 19:30:46 UTC
-Run (local)      : 2026-10-21 01:00:46 +05:30
+Run (UTC)        : 2026-10-24 12:12:34 UTC
+Run (local)      : 2026-10-24 17:42:34 +05:30
 Machine / OS     : DESKTOP-5BV5HTN / Microsoft Windows NT 10.0.26200.0
-PowerShell       : 7.6.7
+PowerShell       : 7.6.8
 Resource service : http://localhost:8082
 Quota service    : http://localhost:8081
 Databases        : postgresql://localhost:5432/{resource_db, quota_db}
-Test tenant      : tnt-br2-20261020-193046   (tier STANDARD => 20 CPU / 64 GB / 10 instances)
-Sequential key   : key-sequential-20261020-193046
-Concurrent key   : key-concurrent-20261020-193046
+Test tenant      : tnt-br2-20261024-121234   (tier STANDARD => 20 CPU / 64 GB / 10 instances)
+Sequential key   : key-sequential-20261024-121234
+Concurrent key   : key-concurrent-20261024-121234
 =============================================================================
 
 --- STEP 0: create the tenant quota will be reserved against -----------------
 create tenant -> HTTP 201
 
 --- database state BEFORE (also saved to db-before.txt) ----------------------
-CHALLENGE 2 - DB STATE BEFORE  (2026-10-20 19:30:46 UTC)
-tenant: tnt-br2-20261020-193046
+CHALLENGE 2 - DB STATE BEFORE  (2026-10-24 12:12:34 UTC)
+tenant: tnt-br2-20261024-121234
 
 --- resource_db: rows for this tenant ---
  resources 
@@ -43,37 +43,37 @@ tenant: tnt-br2-20261020-193046
 (1 row)
 
 
---- STEP 1: FIRST provision with key 'key-sequential-20261020-193046' ------
+--- STEP 1: FIRST provision with key 'key-sequential-20261024-121234' ------
 
-$ curl.exe -s -D - -X POST http://localhost:8082/api/v1/resources -H 'Idempotency-Key: key-sequential-20261020-193046' --data '@provision.json'
+$ curl.exe -s -D - -X POST http://localhost:8082/api/v1/resources -H 'Idempotency-Key: key-sequential-20261024-121234' --data '@provision.json'
 response headers:
 HTTP/1.1 202 
-X-Correlation-Id: 97f064e1-8860-42f8-9969-e998a4492025
-Location: /api/v1/reservations/34b48185-cb69-4419-b64b-5d84bc836444
+X-Correlation-Id: 98654055-234f-4c28-b55a-d3b7c11da890
+Location: /api/v1/reservations/a7c6d902-9018-444f-8277-18fa4e56d414
 Content-Type: application/json
 Transfer-Encoding: chunked
-Date: Tue, 20 Oct 2026 19:30:48 GMT
+Date: Sat, 24 Oct 2026 12:12:35 GMT
 
 response body:
-{"reservationId":"34b48185-cb69-4419-b64b-5d84bc836444","resourceId":"941f1d41-973a-4ccf-a918-cbf5babaa2c8","status":"PENDING","statusUrl":"/api/v1/reservations/34b48185-cb69-4419-b64b-5d84bc836444"}
+{"reservationId":"a7c6d902-9018-444f-8277-18fa4e56d414","resourceId":"1e7a52e7-5189-4889-8583-5b7dea6385d8","status":"PENDING","statusUrl":"/api/v1/reservations/a7c6d902-9018-444f-8277-18fa4e56d414"}
 HTTP 202
 
 --- STEP 2: REPEAT the IDENTICAL request with the SAME key (BR2) -------------
 Expected: HTTP 202, header 'Idempotency-Replayed: true', and the SAME
 reservationId/resourceId - byte-for-byte the first answer, not a new one.
 
-$ curl.exe -s -D - -X POST http://localhost:8082/api/v1/resources -H 'Idempotency-Key: key-sequential-20261020-193046' --data '@provision.json'
+$ curl.exe -s -D - -X POST http://localhost:8082/api/v1/resources -H 'Idempotency-Key: key-sequential-20261024-121234' --data '@provision.json'
 response headers:
 HTTP/1.1 202 
-X-Correlation-Id: 67faee86-4203-412a-809e-6ef05ed99078
+X-Correlation-Id: 19141ce2-7e88-4cd6-acd7-d150d0c54e61
 Idempotency-Replayed: true
-Location: /api/v1/reservations/34b48185-cb69-4419-b64b-5d84bc836444
+Location: /api/v1/reservations/a7c6d902-9018-444f-8277-18fa4e56d414
 Content-Type: application/json
 Content-Length: 199
-Date: Tue, 20 Oct 2026 19:30:51 GMT
+Date: Sat, 24 Oct 2026 12:12:38 GMT
 
 response body:
-{"reservationId":"34b48185-cb69-4419-b64b-5d84bc836444","resourceId":"941f1d41-973a-4ccf-a918-cbf5babaa2c8","status":"PENDING","statusUrl":"/api/v1/reservations/34b48185-cb69-4419-b64b-5d84bc836444"}
+{"reservationId":"a7c6d902-9018-444f-8277-18fa4e56d414","resourceId":"1e7a52e7-5189-4889-8583-5b7dea6385d8","status":"PENDING","statusUrl":"/api/v1/reservations/a7c6d902-9018-444f-8277-18fa4e56d414"}
 HTTP 202
 
 CHECK  replay header present : YES -> Idempotency-Replayed: true
@@ -83,74 +83,74 @@ CHECK  bodies byte-identical : True
 Expected: HTTP 422 IDEMPOTENCY_PAYLOAD_MISMATCH as application/problem+json.
 A key is a receipt for ONE specific request, not a blank cheque.
 
-$ curl.exe -s -D - -X POST http://localhost:8082/api/v1/resources -H 'Idempotency-Key: key-sequential-20261020-193046' --data '@provision-changed.json'  # cpu 4 -> 8
+$ curl.exe -s -D - -X POST http://localhost:8082/api/v1/resources -H 'Idempotency-Key: key-sequential-20261024-121234' --data '@provision-changed.json'  # cpu 4 -> 8
 response headers:
 HTTP/1.1 422 
-X-Correlation-Id: 395f836d-edb6-4262-9143-c58deb2cfc24
+X-Correlation-Id: 51566622-2582-4029-995a-b5c7d8c45d38
 Content-Type: application/problem+json
 Transfer-Encoding: chunked
-Date: Tue, 20 Oct 2026 19:30:51 GMT
+Date: Sat, 24 Oct 2026 12:12:39 GMT
 
 response body:
-{"type":"https://crm.example/errors/idempotency-payload-mismatch","title":"Idempotency payload mismatch","status":422,"detail":"Idempotency-Key key-sequential-20261020-193046 was already used with a different request body","instance":"/api/v1/resources","code":"IDEMPOTENCY_PAYLOAD_MISMATCH","correlationId":"395f836d-edb6-4262-9143-c58deb2cfc24","timestamp":"2026-10-20T19:30:51.737243100Z"}
+{"type":"https://crm.example/errors/idempotency-payload-mismatch","title":"Idempotency payload mismatch","status":422,"detail":"Idempotency-Key key-sequential-20261024-121234 was already used with a different request body","instance":"/api/v1/resources","code":"IDEMPOTENCY_PAYLOAD_MISMATCH","correlationId":"51566622-2582-4029-995a-b5c7d8c45d38","timestamp":"2026-10-24T12:12:39.102526200Z"}
 HTTP 422
 
 the original record must be UNTOUCHED by the rejected attempt:
         idempotency_key         |   state   | response_status |                       request_fingerprint                        
 --------------------------------+-----------+-----------------+------------------------------------------------------------------
- key-sequential-20261020-193046 | COMPLETED |             202 | 2b06ca9a61fd93b76a63a9e981440a6da9e99a6dc1d8645ef1e4889f0d36105b
+ key-sequential-20261024-121234 | COMPLETED |             202 | 56435432a78990e66da7fc5c2a60d85075369374a6a4108205272e40f5ef76fc
 (1 row)
 
 
 --- STEP 4: 10 SIMULTANEOUS duplicates, one shared key (TR-5) --------------
 This is the case a sequential test cannot reach: all 10 callers race for the
 same primary key. Exactly one may win and do the work; the rest must replay it.
-start gun at: 01:00:54.925
+start gun at: 17:42:42.308
 
 
 Worker SentAt       Status Replayed ResourceId
 ------ ------       ------ -------- ----------
-     9 01:00:54.928    202    False 793fcfc8-4a16-41f4-a33e-6cfd0fe9aeba
-     7 01:00:54.928    202     True 793fcfc8-4a16-41f4-a33e-6cfd0fe9aeba
-     3 01:00:54.928    202     True 793fcfc8-4a16-41f4-a33e-6cfd0fe9aeba
-    10 01:00:54.928    202     True 793fcfc8-4a16-41f4-a33e-6cfd0fe9aeba
-     8 01:00:54.928    202     True 793fcfc8-4a16-41f4-a33e-6cfd0fe9aeba
-     1 01:00:54.928    202     True 793fcfc8-4a16-41f4-a33e-6cfd0fe9aeba
-     2 01:00:54.931    202     True 793fcfc8-4a16-41f4-a33e-6cfd0fe9aeba
-     4 01:00:54.931    202     True 793fcfc8-4a16-41f4-a33e-6cfd0fe9aeba
-     6 01:00:54.931    202     True 793fcfc8-4a16-41f4-a33e-6cfd0fe9aeba
-     5 01:00:54.931    202     True 793fcfc8-4a16-41f4-a33e-6cfd0fe9aeba
+     5 17:42:42.321    202    False 0086b962-2232-4e5b-8a0a-cd66d5bf23d1
+     6 17:42:42.321    202     True 0086b962-2232-4e5b-8a0a-cd66d5bf23d1
+    10 17:42:42.321    202     True 0086b962-2232-4e5b-8a0a-cd66d5bf23d1
+     1 17:42:42.321    202     True 0086b962-2232-4e5b-8a0a-cd66d5bf23d1
+     8 17:42:42.321    202     True 0086b962-2232-4e5b-8a0a-cd66d5bf23d1
+     3 17:42:42.321    202     True 0086b962-2232-4e5b-8a0a-cd66d5bf23d1
+     4 17:42:42.321    202     True 0086b962-2232-4e5b-8a0a-cd66d5bf23d1
+     7 17:42:42.321    202     True 0086b962-2232-4e5b-8a0a-cd66d5bf23d1
+     2 17:42:42.323    202     True 0086b962-2232-4e5b-8a0a-cd66d5bf23d1
+     9 17:42:42.323    202     True 0086b962-2232-4e5b-8a0a-cd66d5bf23d1
 
 
 COUNTED RESULT
   HTTP 202 responses        : 10   (expected 10)
   distinct resourceIds seen : 1   (expected 1 - all callers describe ONE resource)
   flagged Idempotency-Replayed: 9   (the winner is not flagged; the losers are)
-  the single resourceId     : 793fcfc8-4a16-41f4-a33e-6cfd0fe9aeba
+  the single resourceId     : 0086b962-2232-4e5b-8a0a-cd66d5bf23d1
 
 --- STEP 5: database state AFTER (also saved to db-after.txt) ----------------
-CHALLENGE 2 - DB STATE AFTER  (2026-10-20 19:30:58 UTC)
-tenant: tnt-br2-20261020-193046
+CHALLENGE 2 - DB STATE AFTER  (2026-10-24 12:12:45 UTC)
+tenant: tnt-br2-20261024-121234
 
 --- idempotency_records for this run's two keys (expect exactly 2: one per key) ---
         idempotency_key         |   state   | response_status 
 --------------------------------+-----------+-----------------
- key-concurrent-20261020-193046 | COMPLETED |             202
- key-sequential-20261020-193046 | COMPLETED |             202
+ key-concurrent-20261024-121234 | COMPLETED |             202
+ key-sequential-20261024-121234 | COMPLETED |             202
 (2 rows)
 
 --- resources for this tenant (expect exactly 2: one sequential + one concurrent) ---
              resource_id              |   type    | cpu | ram_gb | status 
 --------------------------------------+-----------+-----+--------+--------
- 793fcfc8-4a16-41f4-a33e-6cfd0fe9aeba | CONTAINER |   2 |      4 | ACTIVE
- 941f1d41-973a-4ccf-a918-cbf5babaa2c8 | VM        |   4 |      8 | ACTIVE
+ 0086b962-2232-4e5b-8a0a-cd66d5bf23d1 | CONTAINER |   2 |      4 | ACTIVE
+ 1e7a52e7-5189-4889-8583-5b7dea6385d8 | VM        |   4 |      8 | ACTIVE
 (2 rows)
 
 --- reservations for this tenant (expect exactly 2) ---
             reservation_id            |  status   
 --------------------------------------+-----------
- 34b48185-cb69-4419-b64b-5d84bc836444 | COMPLETED
- 58c56998-b0c9-44f0-8b71-f218b559534b | COMPLETED
+ a7c6d902-9018-444f-8277-18fa4e56d414 | COMPLETED
+ 472075d5-eb9e-4e99-8f6e-fd2ee334c393 | COMPLETED
 (2 rows)
 
 --- quota_db: usage. 4+2=6 CPU, 2 instances. NOT 4+(10x2) and NOT doubled ---
@@ -176,5 +176,5 @@ FINAL CHECKS
   idempotency_records = 2 (one per key)               : True   [actual 2]
   quota cpu_used = 6 (4+2, charged once each)         : True   [actual 6]
 VERDICT: PASS - provisioning is idempotent; a reused key with a changed payload is rejected
-Finished (UTC): 2026-10-20 19:30:59
+Finished (UTC): 2026-10-24 12:12:47
 =============================================================================

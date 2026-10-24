@@ -25,49 +25,63 @@ which is the evidence that the injection genuinely survived the asynchronous bou
 than being applied inline.
 
 Note the routing: the directive is `billing:always-fail`, and only billing failed. The provider
-call in the same saga succeeded normally (`peer-calls.txt` line `POST /api/v1/provider/instances
--> 201`). The prefix targets one peer, which is what `SimulateFailureDirective.forProvider()` /
+call in the same saga succeeded normally (`peer-calls.txt` shows the provider provision at 201).
+The prefix targets one peer, which is what `SimulateFailureDirective.forProvider()` /
 `.forBilling()` implement.
 
 ## Which services were real
+
+This evidence is from the **first full seven-service integration run (2026-10-24)** — every
+peer is the teammate's real service, launched with `scripts\demo\start-all.ps1`. The
+`scripts/peer-stub.py` stand-in is NOT used anywhere here.
 
 | Service | In this run | Notes |
 |---|---|---|
 | Resource / orchestrator | **real**, `java -jar`, port 8082 | the code under test |
 | Quota | **real**, `java -jar`, port 8081 | the quota release (undo of step 1) is a real HTTP call to a real service against a real database |
-| PostgreSQL | **real**, local instance, port 5432 | `resource_db` and `resource_db` schemas created by Flyway; all state assertions read actual committed rows |
-| Provider | `scripts/peer-stub.py`, port 8090 | owned by another team member (unit U2/U3), not yet built |
-| Billing | `scripts/peer-stub.py`, port 8090 | owned by another team member, not yet built |
-| Notification | `scripts/peer-stub.py`, port 8090 | owned by another team member, not yet built |
+| Provider | **real**, `java -jar`, port 8085 | Vinayak's U3 service; provisioned and then terminated a real `provider_db` instance row |
+| Billing | **real**, `java -jar`, port 8083 | Karan's U2 service; returned the 503 that drove compensation (see Finding 5 below) |
+| Notification | **real**, `java -jar`, port 8084 | Siddharth's U4 service; wrote the real FAILED notification row |
+| PostgreSQL | **real**, local instance, port 5432 | `resource_db` and `quota_db`, schemas created by Flyway on first boot; all state assertions read actual committed rows |
 
-The three stubbed peers are stubbed because those services do not exist yet — they are other
-members' deliverables. The project's own design anticipates exactly this: `infrastructure-design.md`
-§8 specifies WireMock on a single port (8090) standing in for all three during this unit, and
-`DR-5` states the orchestrator "is developed and tested against WireMock stubs throughout, so
-each service can progress independently of the others." `scripts/peer-stub.py` fills that role
-for a live run rather than a test run.
+An earlier capture of this challenge (2026-10-20) ran the three peers through
+`scripts/peer-stub.py` on port 8090, because those services did not exist yet — the design
+anticipated exactly that (`infrastructure-design.md` §8 specifies a single-port WireMock stand-in,
+and `DR-5` has the orchestrator developed against stubs so each unit can progress independently).
+This run supersedes it: the peers are now real.
 
-The substitution does not weaken what is proven here. Compensation reacts to an **HTTP response
-code**, not to the identity of whatever produced it: a 503 from a stub and a 503 from a real
-Billing service enter `ProvisioningSaga` through the same `catch` block and drive the same
-reverse-order undo. What the stub cannot prove is anything about Billing's own internal
-behaviour — notably **BR5** ("a billing meter stops when its resource is terminated and accrues
-nothing thereafter"), which is a rule about the Billing service's own state and belongs to that
-service's evidence, not this one.
+## Finding 5 — the billing header-value bug this run uncovered and fixed
 
-When the real Billing service lands, these scripts run unchanged: FR-45 requires it to accept
-the same `X-Simulate-Failure` header with the same semantics, so `run.ps1` needs no edit.
+The first real run exposed a contract mismatch that the stub had hidden. The orchestrator sends
+the failure MODE as the header value (`always-fail`, after stripping the `billing:` prefix, per
+FR-42). Billing originally bound `X-Simulate-Failure` to a **boolean**, so it could not parse
+`always-fail` and returned a **500 INTERNAL_ERROR** instead of a 503. Because `PeerRetry` only
+retries 503, the orchestrator did not retry and recorded `INTERNAL_ERROR` rather than
+`BILLING_UNAVAILABLE` — the compensation still ran correctly, but the reason text and the retry
+story were both wrong.
+
+The fix (billing `BillingController`, ~3 lines): accept the header as a `String` and treat both
+`true` (billing's own test value) and `always-fail` (the orchestrator's value) as a simulated
+outage → 503. Full write-up in `aidlc-docs/integration-findings.md`, Finding 5. The evidence
+below is from **after** that fix, which is why the reason reads `BILLING_UNAVAILABLE` again —
+now genuinely produced by the real billing service, not a stub.
+
+The substitution of real peers does not change what compensation proves: it reacts to an **HTTP
+response code**, not to the identity of whatever produced it. A 503 from a stub and a 503 from
+the real billing service enter `ProvisioningSaga` through the same `catch` block and drive the
+same reverse-order undo. What only the real run adds is confidence that the real billing service
+actually emits that 503 for this header — which the stub could never prove.
 
 ## Evidence files
 
 | File | What it contains |
 |---|---|
 | `run.ps1` | the script, re-runnable; creates its own tenant and keys per run |
-| `output.txt` | the captured console output of a real run, with timestamps |
+| `output.txt` | the captured console output of this real run, with timestamps |
 | `db-before.txt` | quota usage, ledger rows and resources before anything ran |
 | `db-after.txt` | the same tables after, showing RESERVED vs RELEASED side by side |
 | `saga-logs.txt` | the orchestrator's own structured log lines for the compensated transaction |
-| `peer-calls.txt` | the downstream call journal — corroborates the log from the other side of the wire |
+| `peer-calls.txt` | the downstream calls seen from the peers' OWN logs — corroborates the saga log from the other side of the wire |
 
 ## Headline result from the captured run
 
@@ -78,9 +92,9 @@ quota after compensation    : 4 CPU   (released in full)
 
 resource ended FAILED                            : True
 provider_instance_id cleared (no orphan, AC-3.5) : True
-failure_reason names the failed step             : True
 quota ledger row flipped to RELEASED (BR7)       : True
 reserved quota returned in full (BR6, AC-3.4)    : True
+VERDICT: PASS
 ```
 
 `failure_reason` on the compensated resource reads:
@@ -94,5 +108,5 @@ The `BILLING_UNAVAILABLE` prefix is load-bearing. Because compensation clears
 can no longer distinguish "failed before an instance existed" from "failed after one was
 created and then cleaned up". The prefix carries that signal instead: `BILLING_UNAVAILABLE` is
 only reachable with step 2 already complete, whereas `PROVIDER_UNAVAILABLE` is only reachable
-with step 2 incomplete. `peer-calls.txt` corroborates it — the `DELETE /api/v1/provider/instances/
-i-mock-3a033fe` proves an instance existed and was explicitly removed by id.
+with step 2 incomplete. `peer-calls.txt` corroborates it — the provider terminate carries the
+same instance id the provision returned, proving an instance existed and was explicitly removed.

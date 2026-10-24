@@ -38,15 +38,32 @@ public class BillingController {
     @PostMapping("/meters")
     public ResponseEntity<MeterResponse> startMeter(
         @Valid @RequestBody StartMeterRequest request,
-        @RequestHeader(name = "X-Simulate-Failure", required = false, defaultValue = "false") boolean simulateFailure
+        @RequestHeader(name = "X-Simulate-Failure", required = false) String simulateFailure
     ) {
         StartMeterResult result = billingService.startMeter(
             new StartMeterCommand(request.resourceId(), request.tenantId(), request.cpu(), request.ratePerCpuHour()),
-            simulateFailure
+            shouldSimulateFailure(simulateFailure)
         );
 
         HttpStatus status = result.created() ? HttpStatus.CREATED : HttpStatus.OK;
         return ResponseEntity.status(status).body(toResponse(result.meter()));
+    }
+
+    /**
+     * Finding 5: the X-Simulate-Failure header is accepted as a String, not a boolean. The
+     * orchestrator's saga strips the "billing:" prefix and sends the MODE ("always-fail"), per
+     * FR-42, so binding this header straight to a boolean made Spring reject "always-fail" and
+     * surface a 500 INTERNAL_ERROR instead of the intended 503. PeerRetry only retries 503, so
+     * the orchestrator never retried and recorded INTERNAL_ERROR rather than BILLING_UNAVAILABLE.
+     * Both the legacy "true" (used by BillingControllerTest) and the orchestrator's "always-fail"
+     * now mean "simulate an outage"; anything else is treated as no simulation.
+     */
+    private static boolean shouldSimulateFailure(String header) {
+        if (header == null) {
+            return false;
+        }
+        String value = header.trim().toLowerCase(java.util.Locale.ROOT);
+        return value.equals("true") || value.equals("always-fail");
     }
 
     @PostMapping("/meters/{resourceId}/stop")

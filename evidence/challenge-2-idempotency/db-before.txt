@@ -1,5 +1,5 @@
-CHALLENGE 2 - DB STATE BEFORE  (2026-10-20 19:30:46 UTC)
-tenant: tnt-br2-20261020-193046
+CHALLENGE 2 - DB STATE BEFORE  (2026-10-24 12:12:34 UTC)
+tenant: tnt-br2-20261024-121234
 
 --- resource_db: rows for this tenant ---
  resources 

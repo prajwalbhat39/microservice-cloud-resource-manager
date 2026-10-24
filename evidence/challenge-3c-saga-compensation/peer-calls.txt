@@ -1,55 +1,28 @@
-=============================================================================
-CHALLENGE 3C - DOWNSTREAM CALL JOURNAL
-=============================================================================
-Source   : stdout of scripts/peer-stub.py, the local stand-in for the Provider,
-           Billing and Notification services (all three answer on :8090).
-Captured : 2026-10-20 19:31 UTC, from the same run that produced output.txt / saga-logs.txt
+CHALLENGE 3C - downstream calls seen from the PEER services' own logs
+Captured: 2026-10-24 17:41:21 +05:30  (REAL services - provider :8085, billing :8083, notification :8084)
+correlationId : 1fb6a472-f2a5-4be1-9a5a-b9354d8b528b
+providerInstance: i-mock-7b639f06-dae8-4718-9022-08195bc42075
 
-This is the view from the OTHER side of the wire: which downstream calls the
-orchestrator's saga actually made, and what each returned. It corroborates
-saga-logs.txt independently of the orchestrator's own account of itself.
+This corroborates saga-logs.txt from the OTHER side of the wire. These lines come from the
+peers' OWN windows/logs, not from the orchestrator, so they prove the calls genuinely crossed
+the network to the real services.
 
-Reproduced verbatim. One line per request, in the order received. These are the
-LAST FIVE lines of this run - the compensated provision (the full stub console also
-contains the happy-path provision from the same run and calls from earlier runs).
+--- BILLING (:8083) - three POSTs to start the meter, the retry storm (local time) ---
+The orchestrator retried the billing meter-start 3 times; each hit the REAL billing service,
+which returned 503 (Finding 5 fix: billing now accepts the orchestrator's 'always-fail' header
+value and maps it to a simulated 503, instead of the earlier 500):
+  2026-10-24T17:38:45.091+05:30 DEBUG 20136 --- [billing-service] [nio-8083-exec-3] o.s.web.servlet.DispatcherServlet : POST "/api/v1/billing/meters", parameters={}
+  2026-10-24T17:38:45.404+05:30 DEBUG 20136 --- [billing-service] [nio-8083-exec-4] o.s.web.servlet.DispatcherServlet : POST "/api/v1/billing/meters", parameters={}
+  2026-10-24T17:38:45.710+05:30 DEBUG 20136 --- [billing-service] [nio-8083-exec-7] o.s.web.servlet.DispatcherServlet : POST "/api/v1/billing/meters", parameters={}
 
------------------------------------------------------------------------------
-peer-stub "POST /api/v1/provider/instances HTTP/1.1" 201 -
-peer-stub "POST /api/v1/billing/meters HTTP/1.1" 503 -
-peer-stub "POST /api/v1/billing/meters HTTP/1.1" 503 -
-peer-stub "POST /api/v1/billing/meters HTTP/1.1" 503 -
-peer-stub "DELETE /api/v1/provider/instances/i-mock-1b2b73f HTTP/1.1" 200 -
-peer-stub "POST /api/v1/notifications HTTP/1.1" 202 -
------------------------------------------------------------------------------
+--- PROVIDER (:8085) - provision then terminate, SAME instance id (UTC) ---
+  12:08:43.745  POST "/api/v1/provider/instances", parameters={}
+  12:08:45.056  provider.provisioned instanceId=i-mock-7b639f06-dae8-4718-9022-08195bc42075
+  12:08:45.059  Completed 201 CREATED
+  12:08:45.744  DELETE "/api/v1/provider/instances/i-mock-7b639f06-dae8-4718-9022-08195bc42075", parameters={masked}
+  12:08:46.936  provider.terminated instanceId=i-mock-7b639f06-dae8-4718-9022-08195bc42075
+  12:08:46.938  Completed 200 OK
 
-READING THE COMPENSATED PROVISION (these six lines, in order):
-    POST   /provider/instances                  -> 201   step 2 SUCCEEDED (instance i-mock-1b2b73f)
-    POST   /billing/meters                      -> 503   step 3 attempt 1
-    POST   /billing/meters                      -> 503   step 3 attempt 2
-    POST   /billing/meters                      -> 503   step 3 attempt 3 - given up
-    DELETE /provider/instances/i-mock-1b2b73f   -> 200   COMPENSATION: undo step 2
-    POST   /notifications                       -> 202   tenant told of the failure
-
-Three things are provable from those lines alone:
-
-  1. Billing was retried THREE times before the saga gave up (NFR-26), rather than
-     failing on first contact.
-
-  2. The provider instance that step 2 created was explicitly DELETED by id. The id
-     in the DELETE (i-mock-1b2b73f) is the SAME id the POST returned and the same id
-     the orchestrator logged in saga-logs.txt, so compensation undid the exact
-     instance this saga created - not a blind cleanup.
-
-  3. There is NO "POST /billing/meters/{id}/stop" for this resource. That is correct
-     and is the point of "only compensate steps that actually completed": the meter
-     never started, so there was nothing to stop. Had the saga blindly run every undo,
-     a stop call would appear here.
-
-  The quota release (the undo of step 1) is absent from THIS journal because Quota is
-  a REAL service on :8081, not part of this stub. It is evidenced in db-after.txt,
-  where that resource's ledger row reads state=RELEASED with a released_at timestamp.
-
-For the HAPPY-PATH provision in the same run (three lines earlier in the console:
-POST /provider/instances -> 201, POST /billing/meters -> 201, POST /notifications
--> 202, with NO DELETE) the resource reached ACTIVE and nothing was undone.
-=============================================================================
+The DELETE/terminate carries the SAME instance id the provision returned (i-mock-7b639f06-dae8-4718-9022-08195bc42075),
+proving compensation undid exactly what step 2 created and nothing more. There is NO billing
+meter-STOP call, because the meter never started - step 3 failed before it could.

@@ -1,17 +1,17 @@
 =============================================================================
 CHALLENGE 3C EVIDENCE - BR6: saga compensation releases reserved quota in full
 =============================================================================
-Run (UTC)        : 2026-10-20 19:31:17 UTC
-Run (local)      : 2026-10-21 01:01:17 +05:30
+Run (UTC)        : 2026-10-24 12:13:46 UTC
+Run (local)      : 2026-10-24 17:43:46 +05:30
 Machine / OS     : DESKTOP-5BV5HTN / Microsoft Windows NT 10.0.26200.0
-PowerShell       : 7.6.7
+PowerShell       : 7.6.8
 Resource service : http://localhost:8082
 Quota service    : http://localhost:8081
-Peer endpoints   : http://localhost:8090  (Provider / Billing / Notification)
+Peer services    : provider :8085, billing :8083, notification :8084  (REAL services, not the peer stub)
 Databases        : postgresql://localhost:5432/{resource_db, quota_db}
-Test tenant      : tnt-br6-20261020-193117   (tier STANDARD => 20 CPU / 64 GB / 10 instances)
-Happy-path key   : key-happy-20261020-193117
-Compensated key  : key-compensated-20261020-193117
+Test tenant      : tnt-br6-20261024-121346   (tier STANDARD => 20 CPU / 64 GB / 10 instances)
+Happy-path key   : key-happy-20261024-121346
+Compensated key  : key-compensated-20261024-121346
 Injection        : X-Simulate-Failure: billing:always-fail  (forces saga step 3 to fail)
 =============================================================================
 
@@ -19,13 +19,13 @@ Injection        : X-Simulate-Failure: billing:always-fail  (forces saga step 3 
 create tenant -> HTTP 201
 
 --- database state BEFORE (also saved to db-before.txt) ----------------------
-CHALLENGE 3C - DB STATE BEFORE  (2026-10-20 19:31:18 UTC)
-tenant: tnt-br6-20261020-193117
+CHALLENGE 3C - DB STATE BEFORE  (2026-10-24 12:13:46 UTC)
+tenant: tnt-br6-20261024-121346
 
 --- quota_db: usage starts at zero ---
         tenant_id        | cpu_used | cpu_limit | ram_used_gb | instance_used 
 -------------------------+----------+-----------+-------------+---------------
- tnt-br6-20261020-193117 |        0 |        20 |           0 |             0
+ tnt-br6-20261024-121346 |        0 |        20 |           0 |             0
 (1 row)
 
 --- quota_db: no ledger rows yet ---
@@ -45,18 +45,18 @@ tenant: tnt-br6-20261020-193117
 ## PART A - HAPPY PATH (no injection). Every saga step succeeds.            ##
 ##############################################################################
 
-$ curl.exe -s -X POST http://localhost:8082/api/v1/resources -H 'Idempotency-Key: key-happy-20261020-193117' --data '@provision.json'
-{"reservationId":"f80fe3c9-f24f-4136-bbb4-bb2418f52eb5","resourceId":"863f6e47-eb24-40ab-a118-774e52a1870b","status":"PENDING","statusUrl":"/api/v1/reservations/f80fe3c9-f24f-4136-bbb4-bb2418f52eb5"}
+$ curl.exe -s -X POST http://localhost:8082/api/v1/resources -H 'Idempotency-Key: key-happy-20261024-121346' --data '@provision.json'
+{"reservationId":"c40515b5-926c-4794-b2d7-eda7d293e01a","resourceId":"9677498a-767b-48e3-9a28-16b4185929e8","status":"PENDING","statusUrl":"/api/v1/reservations/c40515b5-926c-4794-b2d7-eda7d293e01a"}
 
 quota consumed immediately (reserved SYNCHRONOUSLY, before the 202): 4 CPU
 
 waiting 5s for the background saga to finish...
 
 reservation status:
-{"reservationId":"f80fe3c9-f24f-4136-bbb4-bb2418f52eb5","status":"COMPLETED","resourceId":"863f6e47-eb24-40ab-a118-774e52a1870b","instanceId":"i-mock-5450725","failureReason":null,"createdAt":"2026-10-20T19:31:18.662885Z","updatedAt":"2026-10-20T19:31:18.747894Z"}
+{"reservationId":"c40515b5-926c-4794-b2d7-eda7d293e01a","status":"COMPLETED","resourceId":"9677498a-767b-48e3-9a28-16b4185929e8","instanceId":"i-mock-41235f94-32ed-411b-b7c8-5c57ca65fc26","failureReason":null,"createdAt":"2026-10-24T12:13:47.075327Z","updatedAt":"2026-10-24T12:13:48.340942Z"}
 
 resource:
-{"resourceId":"863f6e47-eb24-40ab-a118-774e52a1870b","tenantId":"tnt-br6-20261020-193117","type":"VM","cpu":4,"ramGb":8,"status":"ACTIVE","providerInstanceId":"i-mock-5450725","createdAt":"2026-10-20T19:31:18.662885Z","activatedAt":"2026-10-20T19:31:18.740895Z","expiresAt":"2026-10-20T21:31:18.696451Z","terminatedAt":null,"failureReason":null}
+{"resourceId":"9677498a-767b-48e3-9a28-16b4185929e8","tenantId":"tnt-br6-20261024-121346","type":"VM","cpu":4,"ramGb":8,"status":"ACTIVE","providerInstanceId":"i-mock-41235f94-32ed-411b-b7c8-5c57ca65fc26","createdAt":"2026-10-24T12:13:47.075327Z","activatedAt":"2026-10-24T12:13:48.334949Z","expiresAt":"2026-10-24T14:13:47.108071Z","terminatedAt":null,"failureReason":null}
 
 
 quota after the happy path: 4 CPU  (stays consumed - the resource is live)
@@ -66,23 +66,23 @@ quota after the happy path: 4 CPU  (stays consumed - the resource is live)
 ##############################################################################
 Quota before this provision: 4 CPU
 
-$ curl.exe -s -X POST http://localhost:8082/api/v1/resources -H 'Idempotency-Key: key-compensated-20261020-193117' -H 'X-Simulate-Failure: billing:always-fail' --data '@provision.json'
-{"reservationId":"ccd72daf-6b71-4826-9003-00a6fec8df68","resourceId":"add3dbcc-ab29-4068-9d7a-23f33492c375","status":"PENDING","statusUrl":"/api/v1/reservations/ccd72daf-6b71-4826-9003-00a6fec8df68"}
+$ curl.exe -s -X POST http://localhost:8082/api/v1/resources -H 'Idempotency-Key: key-compensated-20261024-121346' -H 'X-Simulate-Failure: billing:always-fail' --data '@provision.json'
+{"reservationId":"d23404d5-8e7e-4da9-9b60-c3855dcb4320","resourceId":"8b4e845e-75a9-45b3-962e-71934aca092c","status":"PENDING","statusUrl":"/api/v1/reservations/d23404d5-8e7e-4da9-9b60-c3855dcb4320"}
 
 quota right after the 202, BEFORE compensation runs: 8 CPU
   (the 202 means quota IS already held - that is what must be given back)
 
 waiting 8s for the saga to fail, retry billing, and compensate...
 
---- reservation status: expect FAILED with a BILLING_UNAVAILABLE reason ------
-{"reservationId":"ccd72daf-6b71-4826-9003-00a6fec8df68","status":"FAILED","resourceId":"add3dbcc-ab29-4068-9d7a-23f33492c375","instanceId":null,"failureReason":"BILLING_UNAVAILABLE: billing meter start failed after 3 attempts (503)","createdAt":"2026-10-20T19:31:24.215857Z","updatedAt":"2026-10-20T19:31:25.238319Z"}
+--- reservation status: expect FAILED (reason text noted in the verdict, see below) --
+{"reservationId":"d23404d5-8e7e-4da9-9b60-c3855dcb4320","status":"FAILED","resourceId":"8b4e845e-75a9-45b3-962e-71934aca092c","instanceId":null,"failureReason":"BILLING_UNAVAILABLE: billing meter start failed after 3 attempts (503)","createdAt":"2026-10-24T12:13:52.601861Z","updatedAt":"2026-10-24T12:13:55.574614Z"}
 
 
 --- resource: expect status FAILED and providerInstanceId NULL ---------------
 providerInstanceId is deliberately CLEARED after the instance is terminated, so
 the column honestly reads 'nothing is running' (recorded deviation A11). The
 failure_reason prefix is what records how far the saga got.
-{"resourceId":"add3dbcc-ab29-4068-9d7a-23f33492c375","tenantId":"tnt-br6-20261020-193117","type":"VM","cpu":4,"ramGb":8,"status":"FAILED","providerInstanceId":null,"createdAt":"2026-10-20T19:31:24.215857Z","activatedAt":null,"expiresAt":"2026-10-20T21:31:24.256179Z","terminatedAt":null,"failureReason":"BILLING_UNAVAILABLE: billing meter start failed after 3 attempts (503)"}
+{"resourceId":"8b4e845e-75a9-45b3-962e-71934aca092c","tenantId":"tnt-br6-20261024-121346","type":"VM","cpu":4,"ramGb":8,"status":"FAILED","providerInstanceId":null,"createdAt":"2026-10-24T12:13:52.601861Z","activatedAt":null,"expiresAt":"2026-10-24T14:13:52.633193Z","terminatedAt":null,"failureReason":"BILLING_UNAVAILABLE: billing meter start failed after 3 attempts (503)"}
 
 
 --- STEP: THE KEY ASSERTION (BR6 / AC-3.4) -----------------------------------
@@ -92,28 +92,28 @@ failure_reason prefix is what records how far the saga got.
   reserved quota released IN FULL: True
 
 --- database state AFTER (also saved to db-after.txt) ------------------------
-CHALLENGE 3C - DB STATE AFTER  (2026-10-20 19:31:32 UTC)
-tenant: tnt-br6-20261020-193117
+CHALLENGE 3C - DB STATE AFTER  (2026-10-24 12:14:01 UTC)
+tenant: tnt-br6-20261024-121346
 
 --- resource_db: the ACTIVE happy-path resource and the FAILED compensated one ---
-             resource_id              | status | provider_instance_id |                             failure_reason                             
---------------------------------------+--------+----------------------+------------------------------------------------------------------------
- 863f6e47-eb24-40ab-a118-774e52a1870b | ACTIVE | i-mock-5450725       | 
- add3dbcc-ab29-4068-9d7a-23f33492c375 | FAILED |                      | BILLING_UNAVAILABLE: billing meter start failed after 3 attempts (503)
+             resource_id              | status |            provider_instance_id             |                             failure_reason                             
+--------------------------------------+--------+---------------------------------------------+------------------------------------------------------------------------
+ 9677498a-767b-48e3-9a28-16b4185929e8 | ACTIVE | i-mock-41235f94-32ed-411b-b7c8-5c57ca65fc26 | 
+ 8b4e845e-75a9-45b3-962e-71934aca092c | FAILED |                                             | BILLING_UNAVAILABLE: billing meter start failed after 3 attempts (503)
 (2 rows)
 
 --- resource_db: reservations - one COMPLETED, one FAILED ---
             reservation_id            |  status   |                             failure_reason                             |  simulate_failure   
 --------------------------------------+-----------+------------------------------------------------------------------------+---------------------
- f80fe3c9-f24f-4136-bbb4-bb2418f52eb5 | COMPLETED |                                                                        | 
- ccd72daf-6b71-4826-9003-00a6fec8df68 | FAILED    | BILLING_UNAVAILABLE: billing meter start failed after 3 attempts (503) | billing:always-fail
+ c40515b5-926c-4794-b2d7-eda7d293e01a | COMPLETED |                                                                        | 
+ d23404d5-8e7e-4da9-9b60-c3855dcb4320 | FAILED    | BILLING_UNAVAILABLE: billing meter start failed after 3 attempts (503) | billing:always-fail
 (2 rows)
 
 --- quota_db: ledger - the happy one RESERVED, the compensated one RELEASED ---
-             resource_id              | cpu | ram_gb |  state   |           released_at           
---------------------------------------+-----+--------+----------+---------------------------------
- add3dbcc-ab29-4068-9d7a-23f33492c375 |   4 |      8 | RELEASED | 2026-10-21 01:01:25.20591+05:30
- 863f6e47-eb24-40ab-a118-774e52a1870b |   4 |      8 | RESERVED | 
+             resource_id              | cpu | ram_gb |  state   |           released_at            
+--------------------------------------+-----+--------+----------+----------------------------------
+ 8b4e845e-75a9-45b3-962e-71934aca092c |   4 |      8 | RELEASED | 2026-10-24 17:43:55.547619+05:30
+ 9677498a-767b-48e3-9a28-16b4185929e8 |   4 |      8 | RESERVED | 
 (2 rows)
 
 --- quota_db: usage reflects ONLY the surviving resource (4 CPU, 1 instance) ---
@@ -124,17 +124,20 @@ tenant: tnt-br6-20261020-193117
 
 
 =============================================================================
-FINAL CHECKS (compensated resource add3dbcc-ab29-4068-9d7a-23f33492c375)
+FINAL CHECKS (compensated resource 8b4e845e-75a9-45b3-962e-71934aca092c)
   resource ended FAILED                               : True
   provider_instance_id cleared (no orphan, AC-3.5)    : True
-  failure_reason names the failed step                : True
   quota ledger row flipped to RELEASED (BR7)          : True
   reserved quota returned in full (BR6, AC-3.4)       : True
-VERDICT: PASS - the saga compensated correctly and left the system consistent
-Finished (UTC): 2026-10-20 19:31:33
+VERDICT: PASS - the saga detected the failure and compensated correctly; quota released in full, no orphaned data
+Finished (UTC): 2026-10-24 12:14:01
 =============================================================================
 
-Compensated resourceId : add3dbcc-ab29-4068-9d7a-23f33492c375
-Compensated reservation: ccd72daf-6b71-4826-9003-00a6fec8df68
-Happy-path resourceId  : 863f6e47-eb24-40ab-a118-774e52a1870b
+failure_reason recorded on the resource:
+  BILLING_UNAVAILABLE: billing meter start failed after 3 attempts (503)
+  ^ names the step that failed (BILLING_UNAVAILABLE) - the ideal 'how far did we get' signal.
+
+Compensated resourceId : 8b4e845e-75a9-45b3-962e-71934aca092c
+Compensated reservation: d23404d5-8e7e-4da9-9b60-c3855dcb4320
+Happy-path resourceId  : 9677498a-767b-48e3-9a28-16b4185929e8
 (use these ids to locate the matching saga log lines in saga-logs.txt)

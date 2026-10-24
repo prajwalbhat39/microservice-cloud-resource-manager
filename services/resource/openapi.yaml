@@ -1,0 +1,313 @@
+openapi: 3.1.0
+info:
+  title: Resource / Orchestrator Service API
+  description: "Resource lifecycle, idempotent provisioning (Challenge 2), and the\
+    \ saga with compensation (Challenge 3C)."
+  version: v1
+servers:
+- url: http://localhost:8082
+  description: Generated server url
+paths:
+  /api/v1/resources:
+    get:
+      tags:
+      - resource-controller
+      summary: List a tenant's resources (FR-18)
+      operationId: list
+      parameters:
+      - name: tenantId
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResourceListResponse"
+        "400":
+          description: VALIDATION_FAILED
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResourceListResponse"
+    post:
+      tags:
+      - resource-controller
+      summary: Provision a resource (main entry). Challenge 2 + Challenge 3C (FR-11
+        to FR-15)
+      operationId: provision
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          type: string
+      - name: X-Simulate-Failure
+        in: header
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProvisionResourceRequest"
+        required: true
+      responses:
+        "202":
+          description: "Accepted (fresh, replayed, or in-flight)"
+          content:
+            '*/*':
+              schema:
+                type: object
+        "400":
+          description: IDEMPOTENCY_KEY_REQUIRED or VALIDATION_FAILED
+          content:
+            '*/*':
+              schema:
+                type: object
+        "404":
+          description: TENANT_NOT_FOUND
+          content:
+            '*/*':
+              schema:
+                type: object
+        "422":
+          description: "QUOTA_EXCEEDED, TIER_FORBIDS_RESOURCE_TYPE, or IDEMPOTENCY_PAYLOAD_MISMATCH"
+          content:
+            '*/*':
+              schema:
+                type: object
+        "503":
+          description: DOWNSTREAM_UNAVAILABLE
+          content:
+            '*/*':
+              schema:
+                type: object
+  /api/v1/resources/{resourceId}/termination:
+    post:
+      tags:
+      - resource-controller
+      summary: "Terminate a resource, idempotent (FR-20 to FR-22)"
+      operationId: terminate
+      parameters:
+      - name: resourceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "202":
+          description: Terminated or already terminated
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/TerminationAcceptedResponse"
+        "404":
+          description: RESOURCE_NOT_FOUND
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/TerminationAcceptedResponse"
+        "409":
+          description: INVALID_STATE_TRANSITION
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/TerminationAcceptedResponse"
+  /api/v1/resources/{resourceId}:
+    get:
+      tags:
+      - resource-controller
+      summary: Read a resource (FR-17)
+      operationId: get
+      parameters:
+      - name: resourceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResourceResponse"
+        "404":
+          description: RESOURCE_NOT_FOUND
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResourceResponse"
+  /api/v1/resources/expired:
+    get:
+      tags:
+      - resource-controller
+      summary: "Internal: ACTIVE resources past expires_at, for the Expiry Worker\
+        \ (FR-24 support)"
+      operationId: expired
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ExpiredResourceResponse"
+  /api/v1/reservations/{reservationId}:
+    get:
+      tags:
+      - reservation-controller
+      summary: Poll reservation status (FR-16)
+      operationId: get_1
+      parameters:
+      - name: reservationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ReservationStatusResponse"
+        "404":
+          description: RESERVATION_NOT_FOUND
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ReservationStatusResponse"
+components:
+  schemas:
+    ProvisionResourceRequest:
+      type: object
+      properties:
+        tenantId:
+          type: string
+          maxLength: 64
+          minLength: 0
+        type:
+          type: string
+          minLength: 1
+        cpu:
+          type: integer
+          format: int32
+          maximum: 256
+          minimum: 1
+        ramGb:
+          type: integer
+          format: int32
+          maximum: 2048
+          minimum: 1
+        durationSeconds:
+          type: integer
+          format: int64
+          maximum: 2592000
+          minimum: 30
+      required:
+      - cpu
+      - ramGb
+    TerminationAcceptedResponse:
+      type: object
+      properties:
+        resourceId:
+          type: string
+          format: uuid
+        status:
+          type: string
+        terminatedAt:
+          type: string
+          format: date-time
+        alreadyTerminated:
+          type: boolean
+    ResourceListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ResourceResponse"
+        count:
+          type: integer
+          format: int32
+    ResourceResponse:
+      type: object
+      properties:
+        resourceId:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+        type:
+          type: string
+        cpu:
+          type: integer
+          format: int32
+        ramGb:
+          type: integer
+          format: int32
+        status:
+          type: string
+        providerInstanceId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        activatedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        terminatedAt:
+          type: string
+          format: date-time
+        failureReason:
+          type: string
+    ExpiredResourceResponse:
+      type: object
+      properties:
+        resourceId:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+    ReservationStatusResponse:
+      type: object
+      properties:
+        reservationId:
+          type: string
+          format: uuid
+        status:
+          type: string
+        resourceId:
+          type: string
+          format: uuid
+        instanceId:
+          type: string
+        failureReason:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time

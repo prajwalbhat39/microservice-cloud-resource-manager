@@ -1,10 +1,10 @@
-CHALLENGE 3C - DB STATE BEFORE  (2026-10-20 19:31:18 UTC)
-tenant: tnt-br6-20261020-193117
+CHALLENGE 3C - DB STATE BEFORE  (2026-10-24 12:18:10 UTC)
+tenant: tnt-br6-20261024-121809
 
 --- quota_db: usage starts at zero ---
         tenant_id        | cpu_used | cpu_limit | ram_used_gb | instance_used 
 -------------------------+----------+-----------+-------------+---------------
- tnt-br6-20261020-193117 |        0 |        20 |           0 |             0
+ tnt-br6-20261024-121809 |        0 |        20 |           0 |             0
 (1 row)
 
 --- quota_db: no ledger rows yet ---

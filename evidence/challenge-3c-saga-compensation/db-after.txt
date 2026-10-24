@@ -1,25 +1,25 @@
-CHALLENGE 3C - DB STATE AFTER  (2026-10-20 19:31:32 UTC)
-tenant: tnt-br6-20261020-193117
+CHALLENGE 3C - DB STATE AFTER  (2026-10-24 12:18:25 UTC)
+tenant: tnt-br6-20261024-121809
 
 --- resource_db: the ACTIVE happy-path resource and the FAILED compensated one ---
-             resource_id              | status | provider_instance_id |                             failure_reason                             
---------------------------------------+--------+----------------------+------------------------------------------------------------------------
- 863f6e47-eb24-40ab-a118-774e52a1870b | ACTIVE | i-mock-5450725       | 
- add3dbcc-ab29-4068-9d7a-23f33492c375 | FAILED |                      | BILLING_UNAVAILABLE: billing meter start failed after 3 attempts (503)
+             resource_id              | status |            provider_instance_id             |                             failure_reason                             
+--------------------------------------+--------+---------------------------------------------+------------------------------------------------------------------------
+ 07ca8842-3823-4807-818c-1d55e8acab09 | ACTIVE | i-mock-dce1a27f-990f-486a-bc60-5a0c19ac74b3 | 
+ f00f9ca5-8b4e-49c6-a73b-043d50bb3622 | FAILED |                                             | BILLING_UNAVAILABLE: billing meter start failed after 3 attempts (503)
 (2 rows)
 
 --- resource_db: reservations - one COMPLETED, one FAILED ---
             reservation_id            |  status   |                             failure_reason                             |  simulate_failure   
 --------------------------------------+-----------+------------------------------------------------------------------------+---------------------
- f80fe3c9-f24f-4136-bbb4-bb2418f52eb5 | COMPLETED |                                                                        | 
- ccd72daf-6b71-4826-9003-00a6fec8df68 | FAILED    | BILLING_UNAVAILABLE: billing meter start failed after 3 attempts (503) | billing:always-fail
+ b2eff2a2-14c2-451c-a54f-a81a4cd1cc8d | COMPLETED |                                                                        | 
+ c9736af8-0a0b-40c5-8ed4-c36c28bf1e3e | FAILED    | BILLING_UNAVAILABLE: billing meter start failed after 3 attempts (503) | billing:always-fail
 (2 rows)
 
 --- quota_db: ledger - the happy one RESERVED, the compensated one RELEASED ---
-             resource_id              | cpu | ram_gb |  state   |           released_at           
---------------------------------------+-----+--------+----------+---------------------------------
- add3dbcc-ab29-4068-9d7a-23f33492c375 |   4 |      8 | RELEASED | 2026-10-21 01:01:25.20591+05:30
- 863f6e47-eb24-40ab-a118-774e52a1870b |   4 |      8 | RESERVED | 
+             resource_id              | cpu | ram_gb |  state   |           released_at            
+--------------------------------------+-----+--------+----------+----------------------------------
+ f00f9ca5-8b4e-49c6-a73b-043d50bb3622 |   4 |      8 | RELEASED | 2026-10-24 17:48:20.773865+05:30
+ 07ca8842-3823-4807-818c-1d55e8acab09 |   4 |      8 | RESERVED | 
 (2 rows)
 
 --- quota_db: usage reflects ONLY the surviving resource (4 CPU, 1 instance) ---
