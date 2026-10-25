@@ -1,0 +1,61 @@
+Tenant: tnt-demo-471f5f7c766e4a858a81ecfd643509e9
+
+tenantId  : tnt-demo-471f5f7c766e4a858a81ecfd643509e9
+name      : Demo
+tier      : STANDARD
+limits    : @{cpu=20; ramGb=64; instances=10}
+createdAt : 25/10/2026 7:13:28 AM
+
+
+reservationId : 12ffe244-24f7-4317-b149-10464cf626c6
+status        : COMPLETED
+resourceId    : 5df278ed-aa47-41cf-911d-bed648935ec9
+instanceId    : i-mock-f62016bf-5f59-4ae6-8f51-ed6f7408793b
+failureReason :
+createdAt     : 25/10/2026 7:13:29 AM
+updatedAt     : 25/10/2026 7:13:30 AM
+
+
+resourceId         : 5df278ed-aa47-41cf-911d-bed648935ec9
+tenantId           : tnt-demo-471f5f7c766e4a858a81ecfd643509e9
+type               : VM
+cpu                : 4
+ramGb              : 8
+status             : ACTIVE
+providerInstanceId : i-mock-f62016bf-5f59-4ae6-8f51-ed6f7408793b
+createdAt          : 25/10/2026 7:13:29 AM
+activatedAt        : 25/10/2026 7:13:30 AM
+expiresAt          : 25/10/2026 9:13:29 AM
+terminatedAt       :
+failureReason      :
+
+
+meterId        : 56570e32-d3ee-4324-a47d-95b6703a8bd4
+resourceId     : 5df278ed-aa47-41cf-911d-bed648935ec9
+tenantId       : tnt-demo-471f5f7c766e4a858a81ecfd643509e9
+cpu            : 4
+ratePerCpuHour : 0.12
+state          : ACTIVE
+startedAt      : 25/10/2026 7:13:30 AM
+stoppedAt      :
+currentCost    : 0
+
+Replay returned the original reservation and resource.
+
+reservationId : a35f1b5d-05ee-4ece-b63c-cd2e94557d2b
+status        : FAILED
+resourceId    : c3dd2f23-c152-49da-b48d-6e97a2097fa5
+instanceId    :
+failureReason : BILLING_UNAVAILABLE: billing meter start failed after 3
+                attempts (503)
+createdAt     : 25/10/2026 7:13:30 AM
+updatedAt     : 25/10/2026 7:13:32 AM
+
+
+resourceId        : 5df278ed-aa47-41cf-911d-bed648935ec9
+status            : TERMINATED
+terminatedAt      : 25/10/2026 7:13:32 AM
+alreadyTerminated : False
+
+Demo passed: provision, replay, compensation and termination.
+Inspect database records: pwsh scripts/demo/show-footprint.ps1 -TenantId tnt-demo-471f5f7c766e4a858a81ecfd643509e9 -ProveIsolation

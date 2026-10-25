@@ -1,35 +1,35 @@
-CHALLENGE 2 - DB STATE AFTER  (2026-10-24 12:12:45 UTC)
-tenant: tnt-br2-20261024-121234
+CHALLENGE 2 - DB STATE AFTER  (2026-10-25 07:33:21 UTC)
+tenant: tnt-br2-20261025-073312
 
 --- idempotency_records for this run's two keys (expect exactly 2: one per key) ---
-        idempotency_key         |   state   | response_status 
+        idempotency_key         |   state   | response_status
 --------------------------------+-----------+-----------------
- key-concurrent-20261024-121234 | COMPLETED |             202
- key-sequential-20261024-121234 | COMPLETED |             202
+ key-concurrent-20261025-073312 | COMPLETED |             202
+ key-sequential-20261025-073312 | COMPLETED |             202
 (2 rows)
 
 --- resources for this tenant (expect exactly 2: one sequential + one concurrent) ---
-             resource_id              |   type    | cpu | ram_gb | status 
+             resource_id              |   type    | cpu | ram_gb | status
 --------------------------------------+-----------+-----+--------+--------
- 0086b962-2232-4e5b-8a0a-cd66d5bf23d1 | CONTAINER |   2 |      4 | ACTIVE
- 1e7a52e7-5189-4889-8583-5b7dea6385d8 | VM        |   4 |      8 | ACTIVE
+ ec695a25-541f-4947-bcbd-a47b83e431ae | CONTAINER |   2 |      4 | ACTIVE
+ 5cd7f04d-4c56-480d-8c74-d8eee0441479 | VM        |   4 |      8 | ACTIVE
 (2 rows)
 
 --- reservations for this tenant (expect exactly 2) ---
-            reservation_id            |  status   
+            reservation_id            |  status
 --------------------------------------+-----------
- a7c6d902-9018-444f-8277-18fa4e56d414 | COMPLETED
- 472075d5-eb9e-4e99-8f6e-fd2ee334c393 | COMPLETED
+ 5220e02a-b785-4cc0-9480-d39d0cba7ee7 | COMPLETED
+ 56eccd15-5d6c-4875-aac4-8a0abd259455 | COMPLETED
 (2 rows)
 
 --- quota_db: usage. 4+2=6 CPU, 2 instances. NOT 4+(10x2) and NOT doubled ---
- cpu_used | ram_used_gb | instance_used 
+ cpu_used | ram_used_gb | instance_used
 ----------+-------------+---------------
         6 |          12 |             2
 (1 row)
 
 --- quota_db: ledger rows for this tenant (expect exactly 2) ---
- ledger_rows 
+ ledger_rows
 -------------
            2
 (1 row)

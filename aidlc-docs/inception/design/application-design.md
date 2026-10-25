@@ -2,7 +2,7 @@
 
 **Stage**: INCEPTION / Application Design
 **Status**: Awaiting approval
-**Depends on**: `inception/requirements/requirements.md` (approved), `inception/workflow-plan.md` (approved)
+**Depends on**: `inception/requirements/requirements.md` (approved)
 
 This document fixes service boundaries, data ownership, the API of each service, the error
 model, and the saga contract. The service contracts defined here are frozen on approval:

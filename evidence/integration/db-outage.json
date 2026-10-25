@@ -1,0 +1,37 @@
+{
+  "run": "2026-10-25T07:46:34.004608+00:00",
+  "checks": {
+    "quota": {
+      "http": 503,
+      "health": "DOWN",
+      "recoveredHttp": 200
+    },
+    "resource": {
+      "http": 503,
+      "health": "DOWN",
+      "recoveredHttp": 200
+    },
+    "billing": {
+      "http": 503,
+      "health": "DOWN",
+      "recoveredHttp": 200
+    },
+    "notification": {
+      "http": 503,
+      "health": "DOWN",
+      "recoveredHttp": 200
+    },
+    "provider": {
+      "http": 503,
+      "health": "DOWN",
+      "recoveredHttp": 200
+    }
+  },
+  "rejectedWrite": {
+    "resourceId": "4c359a81-77a3-4009-8be2-a04f9cb9c972",
+    "http": 503,
+    "code": "DOWNSTREAM_UNAVAILABLE",
+    "persistedMeters": 0
+  },
+  "result": "PASS: all five database owners report 503/DOWN and recover; Billing rejects writes during outage"
+}

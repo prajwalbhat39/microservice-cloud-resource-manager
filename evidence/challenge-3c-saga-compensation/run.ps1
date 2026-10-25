@@ -1,55 +1,37 @@
-# =============================================================================
-# Challenge 3C / BR6 — Saga with compensation
-#
-# Provisioning spans four steps across services:
-#   1. reserve quota            (Quota service, SYNCHRONOUS, before the 202)
-#   2. create provider instance (Provider)
-#   3. start the billing meter  (Billing)
-#   4. activate + notify        (local + Notification)
-# Steps 2-4 run in a background saga AFTER the 202 has already been returned.
-#
-# BR6: when a step fails after quota has been reserved, compensation must release
-# that quota IN FULL and leave no orphaned data. Compensation runs in REVERSE
-# order and only for steps that actually completed:
-#   undo 3 (stop meter, if started) -> undo 2 (terminate instance) -> undo 1 (release quota)
-#
-# The failure is injected per-request with the X-Simulate-Failure header (FR-46),
-# which the orchestrator persists on the reservation and replays onto the matching
-# downstream call - so the injection survives the asynchronous boundary.
-#
-# Requires: Resource :8082, Quota :8081, and the real peers provider :8085 / billing :8083 /
-#           notification :8084 (via scripts\demo\start-all.ps1), PostgreSQL :5432.
-# Repeatable: every run uses its own tenant and keys (TR-8).
-# =============================================================================
-#Requires -Version 7
+# BR6: run one successful provision and one Billing failure; verify compensation.
+# Start the real services with scripts/demo/start-all.ps1 before running.
+#Requires -Version 7.4
 
 param(
     [string]$ResourceUrl = 'http://localhost:8082',
     [string]$QuotaUrl    = 'http://localhost:8081',
+    [string]$DbHost = 'localhost',
+    [int]$DbPort = 5432,
     [string]$OutDir      = $PSScriptRoot
 )
 
 $ErrorActionPreference = 'Stop'
-$env:PGPASSWORD = 'changeme'
+$PSNativeCommandUseErrorActionPreference = $true
+$env:PGPASSWORD = if ($env:DB_PASSWORD) { $env:DB_PASSWORD } else { 'changeme' }
 
 $runId    = (Get-Date).ToUniversalTime().ToString('yyyyMMdd-HHmmss')
 $tenantId = "tnt-br6-$runId"
 $keyHappy = "key-happy-$runId"
 $keyFail  = "key-compensated-$runId"
-$tmp      = Join-Path $env:TEMP "br6-$runId"
+$tmp      = Join-Path ([System.IO.Path]::GetTempPath()) "br6-$runId"
 New-Item -ItemType Directory -Path $tmp -Force | Out-Null
 
 function Show($cmd) { Write-Host ""; Write-Host "`$ $cmd" }
 function Res-Sql([string]$sql, [string]$outFile) {
-    if ($outFile) { & psql -U resource_user -h localhost -p 5432 -d resource_db -c $sql | Out-File -FilePath $outFile -Encoding utf8 -Append }
-    else          { & psql -U resource_user -h localhost -p 5432 -d resource_db -c $sql }
+    if ($outFile) { & psql -v ON_ERROR_STOP=1 -U resource_user -h $DbHost -p $DbPort -d resource_db -c $sql | Out-File -FilePath $outFile -Encoding utf8 -Append }
+    else          { & psql -v ON_ERROR_STOP=1 -U resource_user -h $DbHost -p $DbPort -d resource_db -c $sql }
 }
 function Quota-Sql([string]$sql, [string]$outFile) {
-    if ($outFile) { & psql -U quota_user -h localhost -p 5432 -d quota_db -c $sql | Out-File -FilePath $outFile -Encoding utf8 -Append }
-    else          { & psql -U quota_user -h localhost -p 5432 -d quota_db -c $sql }
+    if ($outFile) { & psql -v ON_ERROR_STOP=1 -U quota_user -h $DbHost -p $DbPort -d quota_db -c $sql | Out-File -FilePath $outFile -Encoding utf8 -Append }
+    else          { & psql -v ON_ERROR_STOP=1 -U quota_user -h $DbHost -p $DbPort -d quota_db -c $sql }
 }
 function Write-Json($obj, $path) { ($obj | ConvertTo-Json -Compress) | Set-Content -Path $path -Encoding ascii -NoNewline }
-function QuotaUsed { [int](& psql -U quota_user -h localhost -p 5432 -d quota_db -t -A -c "select cpu_used from tenant_quota where tenant_id = '$tenantId';") }
+function QuotaUsed { [int](& psql -v ON_ERROR_STOP=1 -U quota_user -h $DbHost -p $DbPort -d quota_db -t -A -c "select cpu_used from tenant_quota where tenant_id = '$tenantId';") }
 
 # ----------------------------------------------------------------- header -----
 @"
@@ -63,7 +45,7 @@ PowerShell       : $($PSVersionTable.PSVersion)
 Resource service : $ResourceUrl
 Quota service    : $QuotaUrl
 Peer services    : provider :8085, billing :8083, notification :8084  (REAL services, not the peer stub)
-Databases        : postgresql://localhost:5432/{resource_db, quota_db}
+Databases        : postgresql://${DbHost}:${DbPort}/{resource_db, quota_db}
 Test tenant      : $tenantId   (tier STANDARD => 20 CPU / 64 GB / 10 instances)
 Happy-path key   : $keyHappy
 Compensated key  : $keyFail
@@ -76,7 +58,7 @@ Write-Host ""
 Write-Host "--- STEP 0: create the tenant ------------------------------------------------"
 $tenantBody = Join-Path $tmp 'tenant.json'
 Write-Json @{ tenantId = $tenantId; name = "BR6 run $runId"; tier = 'STANDARD' } $tenantBody
-& curl.exe -s -o NUL -w "create tenant -> HTTP %{http_code}`n" -X POST "$QuotaUrl/api/v1/tenants" -H "Content-Type: application/json" --data "@$tenantBody"
+& curl -sS -o $(if ($IsWindows) { 'NUL' } else { '/dev/null' }) -w "create tenant -> HTTP %{http_code}`n" -X POST "$QuotaUrl/api/v1/tenants" -H "Content-Type: application/json" --data "@$tenantBody"
 
 $before = Join-Path $OutDir 'db-before.txt'
 "CHALLENGE 3C - DB STATE BEFORE  ($((Get-Date).ToUniversalTime().ToString('yyyy-MM-dd HH:mm:ss')) UTC)`ntenant: $tenantId`n" | Set-Content $before -Encoding utf8
@@ -98,8 +80,8 @@ Write-Host ""
 Write-Host "##############################################################################"
 Write-Host "## PART A - HAPPY PATH (no injection). Every saga step succeeds.            ##"
 Write-Host "##############################################################################"
-Show "curl.exe -s -X POST $ResourceUrl/api/v1/resources -H 'Idempotency-Key: $keyHappy' --data '@provision.json'"
-$happyBody = & curl.exe -s -X POST "$ResourceUrl/api/v1/resources" -H "Content-Type: application/json" `
+Show "curl -s -X POST $ResourceUrl/api/v1/resources -H 'Idempotency-Key: $keyHappy' --data '@provision.json'"
+$happyBody = & curl -sS -X POST "$ResourceUrl/api/v1/resources" -H "Content-Type: application/json" `
                   -H "Idempotency-Key: $keyHappy" --data "@$provBody"
 Write-Host $happyBody
 $happy = $happyBody | ConvertFrom-Json
@@ -112,10 +94,10 @@ Start-Sleep -Seconds 5
 
 Write-Host ""
 Write-Host "reservation status:"
-& curl.exe -s "$ResourceUrl/api/v1/reservations/$($happy.reservationId)"
+& curl -sS "$ResourceUrl/api/v1/reservations/$($happy.reservationId)"
 Write-Host ""
 Write-Host "resource:"
-& curl.exe -s "$ResourceUrl/api/v1/resources/$($happy.resourceId)"
+& curl -sS "$ResourceUrl/api/v1/resources/$($happy.resourceId)"
 Write-Host ""
 $happyQuota = QuotaUsed
 Write-Host ""
@@ -127,8 +109,8 @@ Write-Host "####################################################################
 Write-Host "## PART B - FAILURE CASE. Billing step 3 forced to fail; saga compensates.  ##"
 Write-Host "##############################################################################"
 Write-Host "Quota before this provision: $happyQuota CPU"
-Show "curl.exe -s -X POST $ResourceUrl/api/v1/resources -H 'Idempotency-Key: $keyFail' -H 'X-Simulate-Failure: billing:always-fail' --data '@provision.json'"
-$failBody = & curl.exe -s -X POST "$ResourceUrl/api/v1/resources" -H "Content-Type: application/json" `
+Show "curl -s -X POST $ResourceUrl/api/v1/resources -H 'Idempotency-Key: $keyFail' -H 'X-Simulate-Failure: billing:always-fail' --data '@provision.json'"
+$failBody = & curl -sS -X POST "$ResourceUrl/api/v1/resources" -H "Content-Type: application/json" `
                  -H "Idempotency-Key: $keyFail" -H "X-Simulate-Failure: billing:always-fail" --data "@$provBody"
 Write-Host $failBody
 $failed = $failBody | ConvertFrom-Json
@@ -144,14 +126,14 @@ Start-Sleep -Seconds 8
 
 Write-Host ""
 Write-Host "--- reservation status: expect FAILED (reason text noted in the verdict, see below) --"
-& curl.exe -s "$ResourceUrl/api/v1/reservations/$($failed.reservationId)"
+& curl -sS "$ResourceUrl/api/v1/reservations/$($failed.reservationId)"
 Write-Host ""
 Write-Host ""
 Write-Host "--- resource: expect status FAILED and providerInstanceId NULL ---------------"
 Write-Host "providerInstanceId is deliberately CLEARED after the instance is terminated, so"
 Write-Host "the column honestly reads 'nothing is running' (recorded deviation A11). The"
 Write-Host "failure_reason prefix is what records how far the saga got."
-& curl.exe -s "$ResourceUrl/api/v1/resources/$($failed.resourceId)"
+& curl -sS "$ResourceUrl/api/v1/resources/$($failed.resourceId)"
 Write-Host ""
 
 $finalQuota = QuotaUsed
@@ -179,21 +161,15 @@ Quota-Sql "select cpu_used, ram_used_gb, instance_used from tenant_quota where t
 Get-Content $after
 
 # ------------------------------------------------------------- verdict --------
-$failedRes = & psql -U resource_user -h localhost -p 5432 -d resource_db -t -A -c "select status, coalesce(provider_instance_id,'NULL'), coalesce(failure_reason,'') from resources where resource_id = '$($failed.resourceId)';"
+$failedRes = & psql -v ON_ERROR_STOP=1 -U resource_user -h $DbHost -p $DbPort -d resource_db -t -A -c "select status, coalesce(provider_instance_id,'NULL'), coalesce(failure_reason,'') from resources where resource_id = '$($failed.resourceId)';"
 $parts = $failedRes -split '\|'
 $statusFailed   = ($parts[0] -eq 'FAILED')
 $instanceClear  = ($parts[1] -eq 'NULL')
 $reasonText     = $parts[2]
 $reasonBilling  = ($reasonText -like 'BILLING_UNAVAILABLE*')
-$ledgerReleased = [int](& psql -U quota_user -h localhost -p 5432 -d quota_db -t -A -c "select count(*) from quota_reservations where resource_id = '$($failed.resourceId)' and state = 'RELEASED';")
+$ledgerReleased = [int](& psql -v ON_ERROR_STOP=1 -U quota_user -h $DbHost -p $DbPort -d quota_db -t -A -c "select count(*) from quota_reservations where resource_id = '$($failed.resourceId)' and state = 'RELEASED';")
 
-# The graded behaviour for Challenge 3C / BR6 is that the SAGA DETECTS THE FAILURE AND
-# COMPENSATES: reserved quota released IN FULL, the provider instance terminated and its
-# id cleared, and the resource left in a terminal FAILED state with no orphaned data.
-# That is what the verdict gates on. The exact TEXT of failure_reason is a secondary
-# "how far did we get" signal, reported below as an observation - it is affected by a
-# documented Billing contract bug (Finding 5) and is NOT the saga's behaviour.
-$compensated = $released -and $statusFailed -and $instanceClear -and ($ledgerReleased -eq 1)
+$compensated = $released -and $statusFailed -and $instanceClear -and ($ledgerReleased -eq 1) -and $reasonBilling
 
 Write-Host ""
 Write-Host "============================================================================="
@@ -206,21 +182,7 @@ Write-Host ("VERDICT: {0}" -f $(if ($compensated) { 'PASS - the saga detected th
 Write-Host "Finished (UTC): $((Get-Date).ToUniversalTime().ToString('yyyy-MM-dd HH:mm:ss'))"
 Write-Host "============================================================================="
 
-# --- Honest observation on the failure_reason text (NOT part of the pass/fail gate) ---
-Write-Host ""
-Write-Host "failure_reason recorded on the resource:"
-Write-Host "  $reasonText"
-if ($reasonBilling) {
-    Write-Host "  ^ names the step that failed (BILLING_UNAVAILABLE) - the ideal 'how far did we get' signal." -ForegroundColor Green
-} else {
-    Write-Host "  ^ NOTE: against the REAL Billing service this currently reads INTERNAL_ERROR, not" -ForegroundColor Yellow
-    Write-Host "    BILLING_UNAVAILABLE. Billing types the X-Simulate-Failure header as a boolean, so the" -ForegroundColor Yellow
-    Write-Host "    orchestrator's 'always-fail' value yields a 500 instead of a 503; PeerRetry only maps" -ForegroundColor Yellow
-    Write-Host "    503 to BILLING_UNAVAILABLE, so the reason text is degraded. This is a documented" -ForegroundColor Yellow
-    Write-Host "    Billing contract bug (aidlc-docs/integration-findings.md, Finding 5) and does NOT" -ForegroundColor Yellow
-    Write-Host "    change the saga's behaviour: the failure was still detected and compensation still" -ForegroundColor Yellow
-    Write-Host "    ran correctly in reverse order, as the PASS checks above show." -ForegroundColor Yellow
-}
+Write-Host "failure_reason: $reasonText"
 Write-Host ""
 Write-Host "Compensated resourceId : $($failed.resourceId)"
 Write-Host "Compensated reservation: $($failed.reservationId)"

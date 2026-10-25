@@ -1,0 +1,161 @@
+{
+  "tenantId": "integration-29911b6af1fa4bb4a7a26fc456515a67",
+  "resources": [
+    {
+      "resource_id": "4789f1ac-641f-4f78-9d6d-4b559f667f6c",
+      "status": "TERMINATED",
+      "provider_instance_id": "i-mock-319b53b7-3c97-46f2-84b2-9dcd7b312716",
+      "expires_at": null,
+      "terminated_at": "2026-10-25T13:17:33.249546+05:30",
+      "failure_reason": null
+    },
+    {
+      "resource_id": "83eff82d-f369-442b-aee6-c9041b087422",
+      "status": "FAILED",
+      "provider_instance_id": null,
+      "expires_at": null,
+      "terminated_at": null,
+      "failure_reason": "BILLING_UNAVAILABLE: billing meter start failed after 3 attempts (503)"
+    },
+    {
+      "resource_id": "260e9ae5-52e2-4282-b61f-a01d38012d42",
+      "status": "TERMINATED",
+      "provider_instance_id": "i-mock-f18f46a3-f891-4961-b75d-d0de8b3d50f6",
+      "expires_at": "2026-10-25T13:18:05.460672+05:30",
+      "terminated_at": "2026-10-25T13:18:05.831184+05:30",
+      "failure_reason": null
+    },
+    {
+      "resource_id": "85a46017-4be4-4987-bf6a-e5f39f9695f4",
+      "status": "TERMINATED",
+      "provider_instance_id": "i-mock-d998c7c3-885e-445f-b0dd-2f7a0887cbe1",
+      "expires_at": null,
+      "terminated_at": "2026-10-25T13:18:07.484476+05:30",
+      "failure_reason": null
+    }
+  ],
+  "reservations": [
+    {
+      "reservation_id": "d3b68159-3a1c-4a6a-992a-4a46cc52938d",
+      "resource_id": "4789f1ac-641f-4f78-9d6d-4b559f667f6c",
+      "status": "COMPLETED",
+      "failure_reason": null
+    },
+    {
+      "reservation_id": "d2ec7e7f-c05e-412a-8b9b-a8a4d35ea421",
+      "resource_id": "83eff82d-f369-442b-aee6-c9041b087422",
+      "status": "FAILED",
+      "failure_reason": "BILLING_UNAVAILABLE: billing meter start failed after 3 attempts (503)"
+    },
+    {
+      "reservation_id": "8b85522d-6ef2-4dc8-b232-9c58f162d9b1",
+      "resource_id": "260e9ae5-52e2-4282-b61f-a01d38012d42",
+      "status": "COMPLETED",
+      "failure_reason": null
+    },
+    {
+      "reservation_id": "48e7dc68-895d-4e4c-872c-8acf0fb94b03",
+      "resource_id": "85a46017-4be4-4987-bf6a-e5f39f9695f4",
+      "status": "COMPLETED",
+      "failure_reason": null
+    }
+  ],
+  "pendingWork": [],
+  "quota": [
+    {
+      "tenant_id": "integration-29911b6af1fa4bb4a7a26fc456515a67",
+      "cpu_used": 0,
+      "cpu_limit": 20,
+      "ram_used_gb": 0,
+      "ram_limit_gb": 64,
+      "instance_used": 0,
+      "instance_limit": 10
+    }
+  ],
+  "meters": [
+    {
+      "resource_id": "4789f1ac-641f-4f78-9d6d-4b559f667f6c",
+      "state": "STOPPED",
+      "started_at": "2026-10-25T13:17:32.933376+05:30",
+      "stopped_at": "2026-10-25T13:17:33.266558+05:30"
+    },
+    {
+      "resource_id": "260e9ae5-52e2-4282-b61f-a01d38012d42",
+      "state": "STOPPED",
+      "started_at": "2026-10-25T13:17:35.481744+05:30",
+      "stopped_at": "2026-10-25T13:18:05.853545+05:30"
+    },
+    {
+      "resource_id": "85a46017-4be4-4987-bf6a-e5f39f9695f4",
+      "state": "STOPPED",
+      "started_at": "2026-10-25T13:18:07.205795+05:30",
+      "stopped_at": "2026-10-25T13:18:10.835579+05:30"
+    }
+  ],
+  "notifications": [
+    {
+      "resource_id": "4789f1ac-641f-4f78-9d6d-4b559f667f6c",
+      "event_type": "ACTIVE",
+      "status": "SENT",
+      "attempts": 1
+    },
+    {
+      "resource_id": "4789f1ac-641f-4f78-9d6d-4b559f667f6c",
+      "event_type": "TERMINATED",
+      "status": "SENT",
+      "attempts": 1
+    },
+    {
+      "resource_id": "83eff82d-f369-442b-aee6-c9041b087422",
+      "event_type": "FAILED",
+      "status": "SENT",
+      "attempts": 1
+    },
+    {
+      "resource_id": "260e9ae5-52e2-4282-b61f-a01d38012d42",
+      "event_type": "ACTIVE",
+      "status": "SENT",
+      "attempts": 1
+    },
+    {
+      "resource_id": "260e9ae5-52e2-4282-b61f-a01d38012d42",
+      "event_type": "TERMINATED",
+      "status": "SENT",
+      "attempts": 1
+    },
+    {
+      "resource_id": "85a46017-4be4-4987-bf6a-e5f39f9695f4",
+      "event_type": "ACTIVE",
+      "status": "SENT",
+      "attempts": 1
+    },
+    {
+      "resource_id": "85a46017-4be4-4987-bf6a-e5f39f9695f4",
+      "event_type": "TERMINATED",
+      "status": "SENT",
+      "attempts": 1
+    }
+  ],
+  "instances": [
+    {
+      "client_token": "ct-4789f1ac-641f-4f78-9d6d-4b559f667f6c",
+      "status": "TERMINATED",
+      "terminated_at": "2026-10-25T13:17:33.260745+05:30"
+    },
+    {
+      "client_token": "ct-83eff82d-f369-442b-aee6-c9041b087422",
+      "status": "TERMINATED",
+      "terminated_at": "2026-10-25T13:17:35.295354+05:30"
+    },
+    {
+      "client_token": "ct-260e9ae5-52e2-4282-b61f-a01d38012d42",
+      "status": "TERMINATED",
+      "terminated_at": "2026-10-25T13:18:05.846697+05:30"
+    },
+    {
+      "client_token": "ct-85a46017-4be4-4987-bf6a-e5f39f9695f4",
+      "status": "TERMINATED",
+      "terminated_at": "2026-10-25T13:18:07.492312+05:30"
+    }
+  ]
+}

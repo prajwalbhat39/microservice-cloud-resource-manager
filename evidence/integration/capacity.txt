@@ -1,0 +1,5 @@
+2026-10-25T07:29:55.367647+00:00
+PASS: 20 simultaneous distinct provisions completed through real peers
+PASS: usage showed 20 CPU and resources, then teardown returned quota to zero
+Observed PostgreSQL connection peak: 30
+Tenant: burst-c38246f9bc5e4513a61658f60e9f7e52

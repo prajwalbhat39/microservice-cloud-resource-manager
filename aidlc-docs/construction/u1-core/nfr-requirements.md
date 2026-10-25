@@ -156,10 +156,7 @@ time.
 Two of these rows are **verification** deferrals only, not design gaps: NFR-11's springdoc
 configuration, export path and annotation convention are fixed in `nfr-design.md` §5.5, and
 NFR-24's pinning rules in §5.6. What waits for the toolchain is running the export and the
-dependency tree, because both need a JVM. The distinction matters because `workflow-plan.md` §1
-scopes NFR Design to "validation, error model, correlation ID, logging, config, migrations", so
-without saying this explicitly a reader could reasonably assume both obligations had simply been
-left to Code Generation to invent.
+dependency tree, because both need a JVM.
 
 ---
 
