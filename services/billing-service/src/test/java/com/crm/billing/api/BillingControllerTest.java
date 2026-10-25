@@ -26,7 +26,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(BillingController.class)
-@Import({GlobalExceptionHandler.class, HealthController.class})
+@Import(GlobalExceptionHandler.class)
 class BillingControllerTest {
 
     @Autowired
@@ -86,6 +86,20 @@ class BillingControllerTest {
 
         mockMvc.perform(get("/api/v1/billing/tenants/tenant-1/cost").param("period", "2026/10"))
             .andExpect(status().isBadRequest());
+    }    @Test
+    void storagePrecisionAndFrameworkErrorsAreClientErrors() throws Exception {
+        mockMvc.perform(post("/api/v1/billing/meters").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"resourceId\":\"r\",\"tenantId\":\"t\",\"cpu\":1,\"ratePerCpuHour\":1000000}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/v1/billing/meters/" + "x".repeat(65) + "/stop"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/v1/billing/meters").contentType(MediaType.APPLICATION_JSON).content("{"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/v1/billing/meters").contentType(MediaType.TEXT_PLAIN).content("plain"))
+                .andExpect(status().isUnsupportedMediaType());
+        mockMvc.perform(get("/api/v1/billing/tenants/tenant/cost").param("period", "+999999999-12"))
+                .andExpect(status().isBadRequest());
     }
+
 }
 

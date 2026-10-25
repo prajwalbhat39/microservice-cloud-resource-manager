@@ -14,7 +14,6 @@ import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,7 +23,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-@Validated
 @RestController
 @RequestMapping("/api/v1/billing")
 public class BillingController {
@@ -35,6 +33,13 @@ public class BillingController {
         this.billingService = billingService;
     }
 
+    @io.swagger.v3.oas.annotations.responses.ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "Meter created"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Existing meter replayed"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid input"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Meter start was cancelled"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "503", description = "Billing unavailable or simulated failure")
+    })
     @PostMapping("/meters")
     public ResponseEntity<MeterResponse> startMeter(
         @Valid @RequestBody StartMeterRequest request,
@@ -49,15 +54,6 @@ public class BillingController {
         return ResponseEntity.status(status).body(toResponse(result.meter()));
     }
 
-    /**
-     * Finding 5: the X-Simulate-Failure header is accepted as a String, not a boolean. The
-     * orchestrator's saga strips the "billing:" prefix and sends the MODE ("always-fail"), per
-     * FR-42, so binding this header straight to a boolean made Spring reject "always-fail" and
-     * surface a 500 INTERNAL_ERROR instead of the intended 503. PeerRetry only retries 503, so
-     * the orchestrator never retried and recorded INTERNAL_ERROR rather than BILLING_UNAVAILABLE.
-     * Both the legacy "true" (used by BillingControllerTest) and the orchestrator's "always-fail"
-     * now mean "simulate an outage"; anything else is treated as no simulation.
-     */
     private static boolean shouldSimulateFailure(String header) {
         if (header == null) {
             return false;
@@ -67,21 +63,21 @@ public class BillingController {
     }
 
     @PostMapping("/meters/{resourceId}/stop")
-    public MeterResponse stopMeter(@PathVariable String resourceId) {
+    public MeterResponse stopMeter(@PathVariable @jakarta.validation.constraints.Size(max = 64) String resourceId) {
         return toResponse(billingService.stopMeter(resourceId));
     }
 
     @GetMapping("/meters/{resourceId}")
-    public MeterResponse getMeter(@PathVariable String resourceId) {
+    public MeterResponse getMeter(@PathVariable @jakarta.validation.constraints.Size(max = 64) String resourceId) {
         return toResponse(billingService.getMeter(resourceId));
     }
 
     @GetMapping("/tenants/{tenantId}/cost")
     public TenantCostResponse getTenantCost(
-        @PathVariable String tenantId,
+        @PathVariable @jakarta.validation.constraints.Size(max = 64) String tenantId,
         @RequestParam(name = "period") String period
     ) {
-        if (period == null || period.isBlank()) {
+        if (period == null || !period.matches("[0-9]{4}-[0-9]{2}")) {
             throw new BadRequestException("period is required and must be in YYYY-MM format");
         }
 

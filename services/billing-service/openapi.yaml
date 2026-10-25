@@ -1,122 +1,147 @@
-openapi: 3.0.3
+openapi: 3.1.0
 info:
-  title: Billing Service API
-  version: 1.0.0
+  title: OpenAPI definition
+  version: v0
 servers:
-  - url: http://localhost:8083
+- url: http://127.0.0.1:8083
+  description: Generated server url
 paths:
-  /health:
-    get:
-      summary: Health check
-      responses:
-        '200':
-          description: Service health
   /api/v1/billing/meters:
     post:
-      summary: Start meter (idempotent on resourceId)
+      tags:
+      - billing-controller
+      operationId: startMeter
       parameters:
-        - in: header
-          name: X-Simulate-Failure
-          schema:
-            type: boolean
+      - name: X-Simulate-Failure
+        in: header
+        required: false
+        schema:
+          type: string
       requestBody:
-        required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/StartMeterRequest'
+              $ref: "#/components/schemas/StartMeterRequest"
+        required: true
       responses:
-        '201':
-          description: Created
+        "201":
+          description: Meter created
           content:
-            application/json:
+            '*/*':
               schema:
-                $ref: '#/components/schemas/MeterResponse'
-        '200':
-          description: Replay for same resourceId
+                $ref: "#/components/schemas/MeterResponse"
+        "200":
+          description: Existing meter replayed
           content:
-            application/json:
+            '*/*':
               schema:
-                $ref: '#/components/schemas/MeterResponse'
-        '400':
-          description: Bad request
-        '503':
-          description: Simulated failure
+                $ref: "#/components/schemas/MeterResponse"
+        "400":
+          description: Invalid input
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MeterResponse"
+        "409":
+          description: Meter start was cancelled
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MeterResponse"
+        "503":
+          description: Billing unavailable or simulated failure
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MeterResponse"
   /api/v1/billing/meters/{resourceId}/stop:
     post:
-      summary: Stop meter (idempotent)
+      tags:
+      - billing-controller
+      operationId: stopMeter
       parameters:
-        - in: path
-          name: resourceId
-          required: true
-          schema:
-            type: string
+      - name: resourceId
+        in: path
+        required: true
+        schema:
+          type: string
+          maxLength: 64
+          minLength: 0
       responses:
-        '200':
-          description: Stopped
+        "200":
+          description: OK
           content:
-            application/json:
+            '*/*':
               schema:
-                $ref: '#/components/schemas/MeterResponse'
-        '404':
-          description: Meter not found
-  /api/v1/billing/meters/{resourceId}:
-    get:
-      summary: Read meter and current cost
-      parameters:
-        - in: path
-          name: resourceId
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Meter
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MeterResponse'
-        '404':
-          description: Meter not found
+                $ref: "#/components/schemas/MeterResponse"
   /api/v1/billing/tenants/{tenantId}/cost:
     get:
-      summary: Month-to-date tenant cost
+      tags:
+      - billing-controller
+      operationId: getTenantCost
       parameters:
-        - in: path
-          name: tenantId
-          required: true
-          schema:
-            type: string
-        - in: query
-          name: period
-          required: true
-          schema:
-            type: string
-            example: 2026-10
+      - name: tenantId
+        in: path
+        required: true
+        schema:
+          type: string
+          maxLength: 64
+          minLength: 0
+      - name: period
+        in: query
+        required: true
+        schema:
+          type: string
       responses:
-        '200':
-          description: Tenant cost
+        "200":
+          description: OK
           content:
-            application/json:
+            '*/*':
               schema:
-                $ref: '#/components/schemas/TenantCostResponse'
-        '400':
-          description: Invalid period
+                $ref: "#/components/schemas/TenantCostResponse"
+  /api/v1/billing/meters/{resourceId}:
+    get:
+      tags:
+      - billing-controller
+      operationId: getMeter
+      parameters:
+      - name: resourceId
+        in: path
+        required: true
+        schema:
+          type: string
+          maxLength: 64
+          minLength: 0
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MeterResponse"
 components:
   schemas:
     StartMeterRequest:
       type: object
-      required: [resourceId, tenantId, cpu]
       properties:
         resourceId:
           type: string
+          maxLength: 64
+          minLength: 0
         tenantId:
           type: string
+          maxLength: 64
+          minLength: 0
         cpu:
           type: integer
+          format: int32
           minimum: 1
         ratePerCpuHour:
           type: number
+          minimum: 0.0
+      required:
+      - resourceId
+      - tenantId
     MeterResponse:
       type: object
       properties:
@@ -129,18 +154,20 @@ components:
           type: string
         cpu:
           type: integer
+          format: int32
         ratePerCpuHour:
           type: number
         state:
           type: string
-          enum: [ACTIVE, STOPPED]
+          enum:
+          - ACTIVE
+          - STOPPED
         startedAt:
           type: string
           format: date-time
         stoppedAt:
           type: string
           format: date-time
-          nullable: true
         currentCost:
           type: number
     TenantCostResponse:
@@ -152,4 +179,3 @@ components:
           type: string
         totalCost:
           type: number
-

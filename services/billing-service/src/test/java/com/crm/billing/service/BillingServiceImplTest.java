@@ -23,6 +23,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 
 @DataJpaTest
+@org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase(replace = org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase.Replace.NONE)
 @Import(BillingServiceImplTest.TestConfig.class)
 class BillingServiceImplTest {
 
@@ -34,6 +35,16 @@ class BillingServiceImplTest {
 
     @Autowired
     private BillingEventRepository eventRepository;
+
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+    @org.springframework.test.context.DynamicPropertySource
+    static void database(org.springframework.test.context.DynamicPropertyRegistry properties) {
+        properties.add("spring.datasource.url", () -> System.getenv().getOrDefault("BILLING_TEST_DB_URL", "jdbc:postgresql://localhost:5432/billing_test"));
+        properties.add("spring.datasource.username", () -> System.getenv().getOrDefault("BILLING_TEST_DB_USER", "billing_user"));
+        properties.add("spring.datasource.password", () -> System.getenv().getOrDefault("BILLING_TEST_DB_PASSWORD", "changeme"));
+    }
 
     @Autowired
     private MutableClock mutableClock;
@@ -125,7 +136,7 @@ class BillingServiceImplTest {
             eventRepository,
             new BillingProperties(new BigDecimal("0.12"), new BigDecimal("1.0")),
             mutableClock,
-            () -> 0.1
+            () -> 0.1, jdbc
         );
 
         assertThatThrownBy(() -> failingService.startMeter(
@@ -150,6 +161,39 @@ class BillingServiceImplTest {
         assertThat(tenantCost.totalCost()).isEqualByComparingTo("0.240000");
     }
 
+    @Test
+    void concurrentStartsAndStopsHaveOneBusinessEffect() throws Exception {
+        String id = java.util.UUID.randomUUID().toString();
+        var command = new StartMeterCommand(id, "race", 2, new BigDecimal("0.12"));
+        var gate = new java.util.concurrent.CountDownLatch(1);
+        try (var pool = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+            var starts = java.util.stream.IntStream.range(0, 5).mapToObj(index -> pool.submit(() -> {
+                gate.await();
+                return billingService.startMeter(command, false);
+            })).toList();
+            gate.countDown();
+            int created = 0;
+            for (var start : starts) if (start.get().created()) created++;
+            assertThat(created).isEqualTo(1);
+            var stops = java.util.stream.IntStream.range(0, 5)
+                    .mapToObj(index -> pool.submit(() -> billingService.stopMeter(id))).toList();
+            var timestamps = new java.util.HashSet<Instant>();
+            for (var stop : stops) timestamps.add(stop.get().stoppedAt());
+            assertThat(timestamps).hasSize(1);
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM billing_events WHERE resource_id = ? AND event_type = 'START'", Integer.class, id)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM billing_events WHERE resource_id = ? AND event_type = 'STOP'", Integer.class, id)).isEqualTo(1);
+        assertThat(billingService.startMeter(command, true).created()).isFalse();
+    }
+
+    @Test
+    void stopBeforeStartPreventsALateMeterFromCharging() {
+        String id = java.util.UUID.randomUUID().toString();
+        assertThatThrownBy(() -> billingService.stopMeter(id)).isInstanceOf(com.crm.billing.web.NotFoundException.class);
+        assertThatThrownBy(() -> billingService.startMeter(new StartMeterCommand(id, "tenant", 1, null), false))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+    }
+
     @TestConfiguration
     static class TestConfig {
 
@@ -158,9 +202,9 @@ class BillingServiceImplTest {
                                       BillingEventRepository eventRepository,
                                       BillingProperties billingProperties,
                                       Clock billingClock,
-                                      DoubleSupplier failureRandomSupplier) {
+                                      DoubleSupplier failureRandomSupplier, org.springframework.jdbc.core.JdbcTemplate jdbc) {
             return new BillingServiceImpl(meterRepository, eventRepository, billingProperties, billingClock,
-                failureRandomSupplier);
+                failureRandomSupplier, jdbc);
         }
 
         @Bean
