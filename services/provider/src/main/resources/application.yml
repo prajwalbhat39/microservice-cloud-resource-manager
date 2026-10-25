@@ -9,6 +9,8 @@ spring:
     username: ${DB_USER:provider_user}
     password: ${DB_PASSWORD:changeme}
     hikari:
+      minimum-idle: 0
+      connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:2000}
       maximum-pool-size: ${DB_POOL_MAX:10}
   flyway:
     enabled: true

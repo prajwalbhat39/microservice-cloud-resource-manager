@@ -42,4 +42,9 @@ public class ProviderService {
         log.info("provider.terminated instanceId={}", id);
         return new InstanceResponse(id, "TERMINATED");
     }
+    public void cancel(String token) {
+        repository.cancel(token);
+        log.info("provider.cancelled clientToken={}", token);
+    }
+
 }

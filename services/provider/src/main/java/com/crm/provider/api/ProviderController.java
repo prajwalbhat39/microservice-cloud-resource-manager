@@ -42,6 +42,7 @@ public class ProviderController {
             description = "Returns the existing instance for a known clientToken, including after termination. "
                     + "Replays bypass simulation and never create another instance.")
     @ApiResponse(responseCode = "201", description = "Created or replayed instance")
+    @ApiResponse(responseCode = "409", description = "Provisioning request was cancelled")
     public InstanceResponse provision(@Valid @RequestBody ProvisionInstanceRequest request,
             @Parameter(description = "always-fail (or true), always-succeed (or false), slow; unknown values use defaults")
             @RequestHeader(value = "X-Simulate-Failure", required = false) String mode) {
@@ -59,4 +60,12 @@ public class ProviderController {
             @RequestHeader(value = "X-Simulate-Failure", required = false) String mode) {
         return service.terminate(id, mode);
     }
+    @DeleteMapping("/requests/{clientToken}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @ApiResponse(responseCode = "204", description = "Request cancelled")
+    @Operation(summary = "Cancel provisioning by client token, including requests still in flight")
+    public void cancel(@PathVariable @jakarta.validation.constraints.Size(max = 256) String clientToken) {
+        service.cancel(clientToken);
+    }
+
 }

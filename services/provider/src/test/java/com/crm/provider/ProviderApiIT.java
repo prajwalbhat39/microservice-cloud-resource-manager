@@ -285,4 +285,20 @@ class ProviderApiIT {
         assertThat(body.path("correlationId").asText()).isNotBlank()
                 .isEqualTo(response.getHeaders().getFirst("X-Correlation-Id"));
     }
+    @Test
+    void cancellationPreventsAnInFlightRequestFromLeavingAnActiveInstance() throws Exception {
+        String token = UUID.randomUUID().toString();
+        try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
+            var provision = pool.submit(() -> {
+                var headers = new HttpHeaders();
+                headers.set("X-Simulate-Failure", "slow");
+                return rest.postForEntity(API, new HttpEntity<>(request(token), headers), JsonNode.class);
+            });
+            var cancelled = rest.exchange(API + "/requests/{token}", HttpMethod.DELETE, HttpEntity.EMPTY, String.class, token);
+            assertThat(cancelled.getStatusCode().value()).isEqualTo(204);
+            assertThat(provision.get().getStatusCode().value()).isIn(201, 409);
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM instances WHERE client_token = ? AND status = 'ACTIVE'", Integer.class, token)).isZero();
+    }
+
 }
