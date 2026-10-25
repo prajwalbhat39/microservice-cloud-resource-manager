@@ -49,6 +49,9 @@ public class ApiErrors extends ResponseEntityExceptionHandler {
                             "message", java.util.Objects.requireNonNullElse(error.getDefaultMessage(), "Invalid value"))))
                     .toList());
         }
+        if (failure instanceof org.springframework.web.bind.MissingServletRequestParameterException missing) {
+            detail.setProperty("errors", java.util.List.of(Map.of("field", missing.getParameterName(), "message", "Required parameter")));
+        }
         enrich(detail, code, request);
         return ResponseEntity.status(status).headers(headers)
                 .contentType(MediaType.APPLICATION_PROBLEM_JSON).body(detail);

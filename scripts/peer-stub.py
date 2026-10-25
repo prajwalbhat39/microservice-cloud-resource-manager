@@ -26,7 +26,7 @@ class Handler(BaseHTTPRequestHandler):
         Returns True if this call was answered as a simulated failure (caller should stop).
         """
         mode = (self.headers.get(SIMULATE_HEADER) or "").strip().lower()
-        if mode == "always-fail":
+        if mode in ("always-fail", "true"):
             self._send(503, {"error": "simulated failure via " + SIMULATE_HEADER})
             return True
         if mode == "slow":
@@ -69,7 +69,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_DELETE(self):
         path = self.path.split("?")[0]
-        if re.fullmatch(r"/api/v1/provider/instances/[^/]+", path):
+        if re.fullmatch(r"/api/v1/provider/instances/(?:requests/)?[^/]+", path):
             self._send(200)
         else:
             self._send(404, {"error": "no stub for " + path})
@@ -81,4 +81,4 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     print(f"peer-stub listening on http://localhost:{PORT}")
-    ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
+    ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()

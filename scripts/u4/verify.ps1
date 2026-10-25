@@ -8,10 +8,10 @@ New-Item -ItemType Directory -Force $evidence | Out-Null
 Start-Transcript -Path "$evidence/tests.txt" -Force | Out-Null
 try {
     Write-Host "Tests $(Get-Date -AsUTC -Format o)"
-    foreach ($service in 'notification', 'usage-aggregator', 'expiry-worker') {
+    foreach ($service in 'notification-service', 'usage-aggregator', 'expiry-worker') {
         $project = Join-Path $repo "services/$service"
         $arguments = @('-B', '-ntp', '-f', "$project/pom.xml", 'clean', 'verify')
-        if ($service -eq 'notification' -and $Postgres) { $arguments += '-Ppostgres' }
+        if ($service -eq 'notification-service' -and $Postgres) { $arguments += '-Ppostgres' }
         Write-Host "COMMAND: $project/$wrapper $arguments"
         & "$project/$wrapper" @arguments
         if ($LASTEXITCODE -ne 0) { throw "$service verification failed" }

@@ -82,7 +82,7 @@ try {
         $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, $port)
         try { $listener.Start() } finally { $listener.Stop() }
     }
-    foreach ($service in 'notification', 'usage-aggregator', 'expiry-worker') {
+    foreach ($service in 'notification-service', 'usage-aggregator', 'expiry-worker') {
         if (-not $SkipBuild) {
             & "$repo/services/$service/$wrapper" -B -ntp -f "$repo/services/$service/pom.xml" -DskipTests package
             if ($LASTEXITCODE -ne 0) { throw "$service build failed" }
@@ -99,7 +99,7 @@ try {
     Set-Stub 'cost' 'GET' "/api/v1/billing/tenants/$tenant/cost" @{ amount = '0.0000'; currency = 'USD' }
     Set-Stub 'expired' 'GET' '/api/v1/resources/expired' @{ items = @(); count = 0 }
     Set-Stub 'terminate' 'POST' "/api/v1/resources/$resourceId/termination" @{ resourceId = $resourceId; status = 'TERMINATED' } 202
-    Start-Java 'notification' "$repo/services/notification/target/notification.jar" @{
+    Start-Java 'notification' "$repo/services/notification-service/target/notification.jar" @{
         SERVER_PORT = "$NotificationPort"; DB_HOST = $DbHost; DB_PORT = "$DbPort"; DB_NAME = $DbName
         DB_USER = $DbUser; DB_PASSWORD = $DbPassword; NOTIFICATION_FAILURE_RATE = '0.0'
     }
@@ -144,7 +144,7 @@ try {
     $history = Invoke-RestMethod "$notification/api/v1/notifications?tenantId=$tenant"
     Require ($history.Count -eq 3 -and @($history | Where-Object status -ne 'SENT').Count -eq 0) 'Persisted lifecycle history is incomplete'
     Write-Host 'PASS: scheduled termination requested; notification history contains all three events'
-    foreach ($entry in @(@('notification', $NotificationPort), @('usage-aggregator', $UsagePort), @('expiry-worker', $WorkerPort))) {
+    foreach ($entry in @(@('notification-service', $NotificationPort), @('usage-aggregator', $UsagePort), @('expiry-worker', $WorkerPort))) {
         $spec = Invoke-RestMethod "http://localhost:$($entry[1])/v3/api-docs"
         Require ($null -ne $spec.paths.'/health'.get.responses.'503') 'OpenAPI omitted unhealthy service response'
         if ($entry[0] -ne 'expiry-worker') {
