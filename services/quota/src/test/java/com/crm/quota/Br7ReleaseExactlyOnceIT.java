@@ -15,8 +15,6 @@ import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.Instant;
@@ -30,31 +28,17 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * BR7 database-backed test (Testcontainers). Proves release is exactly-once: repeated release
- * calls for one resource give back its quota only the first time, enforced by the ledger's
- * UNIQUE(resource_id) and the RESERVED -> RELEASED conditional state flip (functional-design.md 8).
- *
- * <p>This matters because the orchestrator's compensation path and its termination path can both
- * call release for the same resource, and the expiry worker can call it again after a timeout.
- * Skipped automatically when Docker is not available.
- */
-@Testcontainers(disabledWithoutDocker = true)
+/** Concurrent and repeated releases refund quota once against PostgreSQL. */
+@org.junit.jupiter.api.condition.EnabledIf("com.crm.quota.PostgresSingleton#available")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class Br7ReleaseExactlyOnceIT {
 
-    @Container
-    @SuppressWarnings("resource")
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine")
-            .withDatabaseName("quota_db")
-            .withUsername("quota_user")
-            .withPassword("changeme");
 
     @DynamicPropertySource
     static void datasource(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
-        registry.add("spring.datasource.username", POSTGRES::getUsername);
-        registry.add("spring.datasource.password", POSTGRES::getPassword);
+        registry.add("spring.datasource.url", PostgresSingleton::url);
+        registry.add("spring.datasource.username", PostgresSingleton::username);
+        registry.add("spring.datasource.password", PostgresSingleton::password);
     }
 
     @Autowired

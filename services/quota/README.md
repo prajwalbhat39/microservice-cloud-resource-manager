@@ -42,18 +42,13 @@ With the service running, the spec is served live and exported to a committed fi
 curl http://localhost:8081/v3/api-docs.yaml -o openapi.yaml
 ```
 
-## Implemented by the owner (stubbed here)
+## Consistency and tests
 
-Code Generation produced the structure, the schema, the DTOs with validation, the error model,
-the correlation filter and all wiring. The business logic is intentionally left as
-`UnsupportedOperationException` / `fail("TODO")` stubs for the owner to implement from the design:
+Tenant creation inserts only when the ID is absent; a duplicate returns 409 without changing
+limits or usage. Quota capacity is reserved by one conditional SQL update. Operations for the
+same resource ID are serialized; a replay must match its tenant and allocation. Release is
+idempotent. A cancellation record prevents delayed requests from reserving released capacity.
 
-- `domain/TierPolicy` — `parseTier` (INVALID_TIER), `assertTypeAllowed` (BR8)
-- `domain/service/TenantService` — `create`, `get`, `usage`
-- `domain/service/QuotaService` — `reserve` (Challenge 1, BR1), `release` (BR7)
-- `persistence/TenantQuotaRepository` — the atomic conditional UPDATE and the release UPDATE
-- `persistence/SavepointGuard` — duplicate-key recovery
-- `common/error/GlobalExceptionHandler` — the validation field-mapping handlers
-- Tests: `TierPolicyTest` (BR8), `Br1ConcurrencyIT`, `Br7ReleaseExactlyOnceIT` (Testcontainers)
-
-See `aidlc-docs/construction/u1-core/functional-design.md` for the algorithms.
+Run `./mvnw verify`. PostgreSQL tests use Testcontainers, or `QUOTA_TEST_DB_URL` with optional
+`QUOTA_TEST_DB_USER` and `QUOTA_TEST_DB_PASSWORD`. Use a dedicated test database. See the root
+README for the full setup and test command.

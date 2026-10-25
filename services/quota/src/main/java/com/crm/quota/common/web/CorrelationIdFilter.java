@@ -15,14 +15,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.UUID;
 
-/**
- * NFR-13: reads {@code X-Correlation-Id} or generates one, puts it in the SLF4J MDC for the life
- * of the request, echoes it on the response, and ALWAYS clears it in a finally block (MDC is
- * thread-local; leaving a value behind would leak it into the next request on the same thread).
- *
- * <p>The orchestrator copies this class and additionally forwards the id on outbound calls and
- * across the async saga boundary; Quota makes no outbound call, so it only needs the inbound leg.
- */
+/** Clear MDC after each request because server threads are reused. */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class CorrelationIdFilter extends OncePerRequestFilter {

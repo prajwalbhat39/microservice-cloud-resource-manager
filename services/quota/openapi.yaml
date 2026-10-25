@@ -4,7 +4,7 @@ info:
   description: "Tenants, tiers and the quota reservation ledger. Challenge 1 (concurrency)."
   version: v1
 servers:
-- url: http://localhost:8081
+- url: http://127.0.0.1:8081
   description: Generated server url
 paths:
   /api/v1/tenants:
@@ -99,6 +99,8 @@ paths:
         required: true
         schema:
           type: string
+          maxLength: 64
+          minLength: 0
       responses:
         "200":
           description: Released (or no-op replay)
@@ -179,6 +181,9 @@ components:
         tier:
           type: string
           minLength: 1
+      required:
+      - name
+      - tier
     Limits:
       type: object
       properties:
@@ -232,6 +237,9 @@ components:
       required:
       - cpu
       - ramGb
+      - resourceId
+      - tenantId
+      - type
     DimensionView:
       type: object
       properties:

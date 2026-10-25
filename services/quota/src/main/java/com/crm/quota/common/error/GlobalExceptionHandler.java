@@ -1,149 +1,92 @@
 package com.crm.quota.common.error;
 
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.ConstraintViolation;
-import jakarta.validation.ConstraintViolationException;
-import jakarta.validation.Path;
+import java.net.URI;
+import java.time.Instant;
+import java.util.Locale;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.ProblemDetail;
-import org.springframework.validation.FieldError;
-import org.springframework.validation.ObjectError;
-import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.slf4j.MDC;
+import org.springframework.dao.DataAccessException;
+import org.springframework.transaction.TransactionException;
+import org.springframework.http.*;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.bind.MissingRequestHeaderException;
-import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.context.request.ServletWebRequest;
+import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-
-/**
- * Single advice for the whole service (NFR-10). Every response here is built through
- * {@link ProblemDetailsFactory}, so every error body carries code/correlationId/timestamp.
- *
- * <p>Copied verbatim into com.crm.resource.common.error (NFR-5: no shared library). Validation
- * failures are collected field-by-field into the {@code errors} extension member, exactly as
- * nfr-design.md 1.2 specifies.
- */
 @RestControllerAdvice
-public class GlobalExceptionHandler {
-
+public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    /** Primary handler: every anticipated failure is an ApiException carrying its code. */
+    @Override
+    protected ResponseEntity<Object> handleExceptionInternal(Exception failure, Object body,
+            HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        String code = switch (status.value()) {
+            case 404 -> "ENDPOINT_NOT_FOUND";
+            case 400 -> failure instanceof HttpMessageNotReadableException
+                    ? "MALFORMED_REQUEST" : "VALIDATION_FAILED";
+            case 405 -> "METHOD_NOT_ALLOWED";
+            case 406 -> "NOT_ACCEPTABLE";
+            case 415 -> "UNSUPPORTED_MEDIA_TYPE";
+            case 500 -> "INTERNAL_ERROR";
+            default -> "HTTP_" + status.value();
+        };
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(status, "Request could not be processed");
+        if (failure instanceof MethodArgumentNotValidException validation) {
+            detail.setProperty("errors", validation.getBindingResult().getFieldErrors().stream()
+                    .map(e -> Map.of("field", e.getField(), "message", e.getDefaultMessage())).toList());
+        }
+        if (failure instanceof HandlerMethodValidationException validation) {
+            detail.setProperty("errors", validation.getParameterValidationResults().stream()
+                    .flatMap(result -> result.getResolvableErrors().stream().map(error -> Map.of(
+                            "field", java.util.Objects.requireNonNullElse(
+                                    result.getMethodParameter().getParameterName(), "request"),
+                            "message", java.util.Objects.requireNonNullElse(error.getDefaultMessage(), "Invalid value"))))
+                    .toList());
+        }
+        if (failure instanceof org.springframework.web.bind.MissingServletRequestParameterException missing) {
+            detail.setProperty("errors", java.util.List.of(Map.of("field", missing.getParameterName(), "message", "Required parameter")));
+        }
+        enrich(detail, code, request);
+        return ResponseEntity.status(status).headers(headers)
+                .contentType(MediaType.APPLICATION_PROBLEM_JSON).body(detail);
+    }
+
     @ExceptionHandler(ApiException.class)
-    public ProblemDetail onApi(ApiException e, HttpServletRequest req) {
-        log.warn("api.error code={} status={} path={}", e.code(), e.code().status(), req.getRequestURI());
-        return ProblemDetailsFactory.problem(e.code(), e.code().status(), e.getMessage(), req, e.extensions());
+    ResponseEntity<Object> business(ApiException failure, WebRequest request) {
+        var servlet = ((ServletWebRequest) request).getRequest();
+        return ResponseEntity.status(failure.code().status()).contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .body(ProblemDetailsFactory.problem(failure.code(), failure.code().status(), failure.getMessage(), servlet, failure.extensions()));
     }
 
-    /** Body-field constraint violations -> 400 VALIDATION_FAILED with one errors[] entry each. */
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ProblemDetail onBodyValidation(MethodArgumentNotValidException e, HttpServletRequest req) {
-        // One errors[] entry per FieldError: { field, message, rejectedValue } (nfr-design.md 1.2).
-        List<Map<String, Object>> errors = new ArrayList<>();
-        for (FieldError fe : e.getBindingResult().getFieldErrors()) {
-            errors.add(errorEntry(fe.getField(), fe.getDefaultMessage(), fe.getRejectedValue()));
-        }
-        // Object-level (class) constraints have no field; report them under their object name.
-        for (ObjectError oe : e.getBindingResult().getGlobalErrors()) {
-            errors.add(errorEntry(oe.getObjectName(), oe.getDefaultMessage(), null));
-        }
-        return validationProblem(errors, req);
+    @ExceptionHandler({DataAccessException.class, TransactionException.class})
+    ResponseEntity<Object> databaseUnavailable(RuntimeException failure, WebRequest request) {
+        log.error("api.persistence.failed cause={}", failure.getClass().getSimpleName());
+        return problem(HttpStatus.SERVICE_UNAVAILABLE, "DOWNSTREAM_UNAVAILABLE", request);
     }
 
-    /** Query/path constraint violations -> 400 VALIDATION_FAILED. */
-    @ExceptionHandler(ConstraintViolationException.class)
-    public ProblemDetail onParamValidation(ConstraintViolationException e, HttpServletRequest req) {
-        // One errors[] entry per violation; field = last node of the property path (nfr-design.md 1.2).
-        List<Map<String, Object>> errors = new ArrayList<>();
-        for (ConstraintViolation<?> v : e.getConstraintViolations()) {
-            errors.add(errorEntry(lastPathNode(v.getPropertyPath()), v.getMessage(), v.getInvalidValue()));
-        }
-        return validationProblem(errors, req);
-    }
-
-    private static ProblemDetail validationProblem(List<Map<String, Object>> errors, HttpServletRequest req) {
-        return ProblemDetailsFactory.problem(ErrorCode.VALIDATION_FAILED, 400,
-                errors.size() + " field(s) are invalid", req, Map.of("errors", errors));
-    }
-
-    /**
-     * Build one errors[] entry. rejectedValue is included only for scalars (String, Number,
-     * Boolean, Enum); anything else is omitted so no structured/sensitive content is echoed (NFR-17).
-     */
-    private static Map<String, Object> errorEntry(String field, String message, Object rejectedValue) {
-        Map<String, Object> entry = new LinkedHashMap<>();
-        entry.put("field", field);
-        entry.put("message", message);
-        if (isScalar(rejectedValue)) {
-            entry.put("rejectedValue", rejectedValue instanceof Enum<?> en ? en.name() : rejectedValue);
-        }
-        return entry;
-    }
-
-    private static boolean isScalar(Object v) {
-        return v instanceof CharSequence || v instanceof Number || v instanceof Boolean || v instanceof Enum<?>;
-    }
-
-    private static String lastPathNode(Path path) {
-        String last = null;
-        for (Path.Node node : path) {
-            last = node.getName();
-        }
-        return last;
-    }
-
-    /** Missing required header. Idempotency-Key is special-cased to its own code (orchestrator). */
-    @ExceptionHandler(MissingRequestHeaderException.class)
-    public ProblemDetail onMissingHeader(MissingRequestHeaderException e, HttpServletRequest req) {
-        ErrorCode code = "Idempotency-Key".equalsIgnoreCase(e.getHeaderName())
-                ? ErrorCode.IDEMPOTENCY_KEY_REQUIRED
-                : ErrorCode.VALIDATION_FAILED;
-        return ProblemDetailsFactory.problem(code, code.status(),
-                "Required header missing: " + e.getHeaderName(), req, Map.of());
-    }
-
-    /** Missing required query parameter -> 400 VALIDATION_FAILED. */
-    @ExceptionHandler(MissingServletRequestParameterException.class)
-    public ProblemDetail onMissingParam(MissingServletRequestParameterException e, HttpServletRequest req) {
-        return ProblemDetailsFactory.problem(ErrorCode.VALIDATION_FAILED, 400,
-                "Required parameter missing: " + e.getParameterName(), req,
-                Map.of("errors", List.of(Map.of("field", e.getParameterName(), "message", "must be provided"))));
-    }
-
-    /** Unparseable JSON / wrong type -> 400 MALFORMED_REQUEST (no errors[]; nothing bound). */
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ProblemDetail onUnreadable(HttpMessageNotReadableException e, HttpServletRequest req) {
-        return ProblemDetailsFactory.problem(ErrorCode.MALFORMED_REQUEST, 400,
-                "Request body could not be read", req, Map.of());
-    }
-
-    /** Unmapped path -> 404. */
-    @ExceptionHandler(NoResourceFoundException.class)
-    public ProblemDetail onNoResource(NoResourceFoundException e, HttpServletRequest req) {
-        return ProblemDetailsFactory.problem(ErrorCode.RESOURCE_NOT_FOUND, 404,
-                "No handler for " + req.getRequestURI(), req, Map.of());
-    }
-
-    /** Wrong HTTP method -> 405. */
-    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
-    public ProblemDetail onMethod(HttpRequestMethodNotSupportedException e, HttpServletRequest req) {
-        return ProblemDetailsFactory.problem(ErrorCode.METHOD_NOT_ALLOWED, 405,
-                "Method " + e.getMethod() + " not allowed", req, Map.of());
-    }
-
-    /** Last resort. Nothing foreseeable reaches here; if it does it is a bug: log the stack, leak nothing. */
     @ExceptionHandler(Exception.class)
-    public ProblemDetail onUnexpected(Exception e, HttpServletRequest req) {
-        log.error("api.error.unexpected path={}", req.getRequestURI(), e);
-        return ProblemDetailsFactory.problem(ErrorCode.INTERNAL_ERROR, 500,
-                "An unexpected error occurred", req, Map.of());
+    ResponseEntity<Object> unexpected(Exception failure, WebRequest request) {
+        log.error("api.unexpected cause={}", failure.getClass().getSimpleName());
+        return problem(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", request);
+    }
+
+    private ResponseEntity<Object> problem(HttpStatus status, String code, WebRequest request) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(status, status.getReasonPhrase());
+        enrich(detail, code, request);
+        return ResponseEntity.status(status).contentType(MediaType.APPLICATION_PROBLEM_JSON).body(detail);
+    }
+
+    private void enrich(ProblemDetail detail, String code, WebRequest request) {
+        detail.setType(URI.create("https://crm.example/errors/" + code.toLowerCase(Locale.ROOT).replace('_', '-')));
+        detail.setInstance(URI.create(((ServletWebRequest) request).getRequest().getRequestURI()));
+        detail.setProperty("code", code);
+        detail.setProperty("correlationId", MDC.get("correlationId"));
+        detail.setProperty("timestamp", Instant.now());
     }
 }

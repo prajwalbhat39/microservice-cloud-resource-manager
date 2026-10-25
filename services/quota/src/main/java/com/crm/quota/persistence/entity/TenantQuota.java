@@ -5,13 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-/**
- * Maps {@code tenant_quota}, THE contended resource (Condition C, BR1). Deliberately has no
- * {@code @Version} column: concurrency is handled by the atomic conditional UPDATE in
- * {@code QuotaService.reserve}, not by optimistic locking. Usage fields are updated only through
- * that native UPDATE, never by a JPA dirty-check, so a stale managed copy can never write back a
- * wrong count.
- */
+/** Usage changes through native atomic SQL; JPA must not flush a stale counter. */
 @Entity
 @Table(name = "tenant_quota")
 public class TenantQuota {

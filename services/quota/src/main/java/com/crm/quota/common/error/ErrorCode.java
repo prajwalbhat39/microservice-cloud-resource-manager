@@ -1,16 +1,6 @@
 package com.crm.quota.common.error;
 
-/**
- * The complete {@code code} vocabulary (nfr-design.md 2.2). This enum is the single source of
- * truth for the whole system and is copied verbatim into every service; a service may only emit
- * the codes listed against it in the design. Each code carries its HTTP status, so a code can
- * never be returned with two different statuses by two different services.
- *
- * <p>The full catalogue is listed here (not only Quota's) so the copied class is identical
- * across services. Quota emits: VALIDATION_FAILED, MALFORMED_REQUEST, TENANT_NOT_FOUND,
- * QUOTA_RESERVATION_NOT_FOUND, TENANT_ALREADY_EXISTS, QUOTA_RESERVATION_ALREADY_RELEASED,
- * QUOTA_EXCEEDED, TIER_FORBIDS_RESOURCE_TYPE, INVALID_TIER, METHOD_NOT_ALLOWED, INTERNAL_ERROR.
- */
+/** Problem codes and HTTP statuses used by the Quota API. */
 public enum ErrorCode {
 
     // 400

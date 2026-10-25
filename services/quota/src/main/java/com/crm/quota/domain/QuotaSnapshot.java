@@ -1,18 +1,6 @@
 package com.crm.quota.domain;
 
-/**
- * Immutable value object: used/limit/remaining across the three dimensions at one instant.
- * {@code remaining} is always computed ({@code limit - used}), never stored, so it cannot drift
- * from the truth. This is the shape surfaced by the quota usage endpoint (FR-9) and consumed by
- * the Usage aggregator (U4).
- *
- * @param cpuUsed        current CPU in use
- * @param cpuLimit       CPU ceiling for the tier
- * @param ramUsedGb      current RAM in use (GB)
- * @param ramLimitGb     RAM ceiling for the tier (GB)
- * @param instanceUsed   current instance count
- * @param instanceLimit  instance ceiling for the tier
- */
+/** Remaining quota is derived from usage and limits, never stored separately. */
 public record QuotaSnapshot(
         int cpuUsed, int cpuLimit,
         int ramUsedGb, int ramLimitGb,

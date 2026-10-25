@@ -13,8 +13,6 @@ import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.List;
@@ -27,17 +25,8 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * BR1 / Challenge 1 database-backed test (Testcontainers, real PostgreSQL). Proves the atomic
- * conditional UPDATE never over-allocates under concurrency: N parallel reservations against a
- * limit of N CPU succeed, the rest get 422 QUOTA_EXCEEDED, and tenant_quota is exactly at its
- * limit afterward — not above it, and not below it either (AC-1.1 to AC-1.4).
- *
- * <p>This is the test the mechanism actually needs: a check-then-update in application code
- * passes every single-threaded test and fails this one. Skipped automatically when Docker is
- * not available.
- */
-@Testcontainers(disabledWithoutDocker = true)
+/** Concurrent reservations must reach capacity without exceeding it. */
+@org.junit.jupiter.api.condition.EnabledIf("com.crm.quota.PostgresSingleton#available")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class Br1ConcurrencyIT {
 
@@ -47,18 +36,12 @@ class Br1ConcurrencyIT {
     private static final int CONCURRENT_REQUESTS = 20;
     private static final int EXPECTED_SUCCESSES = 5;
 
-    @Container
-    @SuppressWarnings("resource")   // closed by the Testcontainers JUnit extension
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine")
-            .withDatabaseName("quota_db")
-            .withUsername("quota_user")
-            .withPassword("changeme");
 
     @DynamicPropertySource
     static void datasource(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
-        registry.add("spring.datasource.username", POSTGRES::getUsername);
-        registry.add("spring.datasource.password", POSTGRES::getPassword);
+        registry.add("spring.datasource.url", PostgresSingleton::url);
+        registry.add("spring.datasource.username", PostgresSingleton::username);
+        registry.add("spring.datasource.password", PostgresSingleton::password);
     }
 
     @Autowired
@@ -146,4 +129,51 @@ class Br1ConcurrencyIT {
         assertThat(response.getStatusCode().value()).isEqualTo(422);
         assertThat(response.getBody()).contains("QUOTA_EXCEEDED").contains("exhausted").contains("CPU");
     }
+    @Test
+    void duplicateTenantCannotResetReservedQuota() {
+        String tenant = "duplicate-" + UUID.randomUUID();
+        var body = new CreateTenantRequest(tenant, "Original", "STANDARD");
+        assertThat(rest.postForEntity("/api/v1/tenants", body, String.class).getStatusCode().value()).isEqualTo(201);
+        var reservation = new ReserveQuotaRequest(tenant, UUID.randomUUID().toString(), "VM", 4, 8);
+        assertThat(rest.postForEntity("/api/v1/quota/reservations", reservation, String.class).getStatusCode().value()).isEqualTo(200);
+        var duplicate = new CreateTenantRequest(tenant, "Replacement", "ENTERPRISE");
+        assertThat(rest.postForEntity("/api/v1/tenants", duplicate, String.class).getStatusCode().value()).isEqualTo(409);
+        var quota = rest.getForObject("/api/v1/tenants/{id}/quota", QuotaUsageResponse.class, tenant);
+        assertThat(quota.cpu().used()).isEqualTo(4);
+        assertThat(quota.cpu().limit()).isEqualTo(20);
+        assertThat(rest.getForObject("/api/v1/tenants/{id}", TenantResponse.class, tenant).name()).isEqualTo("Original");
+    }
+
+    @Test
+    void concurrentQuotaRetriesShareOneAllocationAndRejectDifferentPayloads() throws Exception {
+        String tenant = "retry-" + UUID.randomUUID();
+        rest.postForEntity("/api/v1/tenants", new CreateTenantRequest(tenant, "Retries", "STANDARD"), String.class);
+        var request = new ReserveQuotaRequest(tenant, UUID.randomUUID().toString(), "VM", 20, 8);
+        var start = new CountDownLatch(1);
+        try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
+            var replies = java.util.stream.IntStream.range(0, 5).mapToObj(index -> pool.submit(() -> {
+                start.await();
+                return rest.postForEntity("/api/v1/quota/reservations", request, ReserveQuotaResponse.class);
+            })).toList();
+            start.countDown();
+            for (var reply : replies) assertThat(reply.get().getStatusCode().value()).isEqualTo(200);
+        }
+        var quota = rest.getForObject("/api/v1/tenants/{id}/quota", QuotaUsageResponse.class, tenant);
+        assertThat(quota.cpu().used()).isEqualTo(20);
+        assertThat(quota.instances().used()).isEqualTo(1);
+        var changed = new ReserveQuotaRequest(tenant, request.resourceId(), "VM", 1, 8);
+        assertThat(rest.postForEntity("/api/v1/quota/reservations", changed, String.class).getStatusCode().value()).isEqualTo(400);
+    }
+
+    @Test
+    void releaseBeforeLateReservationPreventsAnOrphanedAllocation() {
+        String tenant = "cancel-" + UUID.randomUUID();
+        rest.postForEntity("/api/v1/tenants", new CreateTenantRequest(tenant, "Cancellation", "STANDARD"), String.class);
+        String id = UUID.randomUUID().toString();
+        assertThat(rest.postForEntity("/api/v1/quota/reservations/{id}/release", null, String.class, id).getStatusCode().value()).isEqualTo(404);
+        var late = new ReserveQuotaRequest(tenant, id, "VM", 4, 8);
+        assertThat(rest.postForEntity("/api/v1/quota/reservations", late, String.class).getStatusCode().value()).isEqualTo(409);
+        assertThat(rest.getForObject("/api/v1/tenants/{id}/quota", QuotaUsageResponse.class, tenant).cpu().used()).isZero();
+    }
+
 }
