@@ -7,29 +7,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Locale;
 
-/**
- * BR2/BR3: canonicalise the provisioning request body, then SHA-256 it, so the comparison is
- * insensitive to things that are not the payload (key order, whitespace, "VM" vs "vm") and
- * sensitive to everything that is (any value change, a field appearing or disappearing).
- *
- * <p>Fingerprint covers the REQUEST BODY ONLY. Headers, including X-Simulate-Failure, are
- * excluded (assumption A4) — so the same key with the same body but a different simulate
- * header replays the original response and does not re-inject.
- *
- * <p>Implementation (functional-design.md 9.1):
- * <ol>
- *   <li>Build a canonical JSON object with keys in fixed alphabetical order
- *       (cpu, durationSeconds, ramGb, tenantId, type), no whitespace, absent optional fields
- *       written as null, type upper-cased, tenantId trimmed. Example:
- *       {@code {"cpu":4,"durationSeconds":7200,"ramGb":8,"tenantId":"tnt-std-001","type":"VM"}}
- *   <li>UTF-8 encode those bytes
- *   <li>SHA-256 hash them
- *   <li>Render as lowercase hex (64 characters) — matches the DB column's
- *       CHECK (request_fingerprint ~ '^[0-9a-f]{64}$')
- * </ol>
- * The JSON is written by hand rather than via an ObjectMapper so the canonical form can never
- * change because of a Jackson setting or a version upgrade.
- */
+/** Hash canonical request fields; simulation headers are excluded from the replay identity. */
 public final class RequestFingerprint {
 
     private RequestFingerprint() {

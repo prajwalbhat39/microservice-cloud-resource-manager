@@ -5,7 +5,7 @@ info:
     \ saga with compensation (Challenge 3C)."
   version: v1
 servers:
-- url: http://localhost:8082
+- url: http://127.0.0.1:8082
   description: Generated server url
 paths:
   /api/v1/resources:
@@ -50,6 +50,8 @@ paths:
         required: false
         schema:
           type: string
+          maxLength: 200
+          minLength: 0
       - name: X-Simulate-Failure
         in: header
         required: false
@@ -163,9 +165,7 @@ paths:
           content:
             '*/*':
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ExpiredResourceResponse"
+                $ref: "#/components/schemas/ExpiredResourceListResponse"
   /api/v1/reservations/{reservationId}:
     get:
       tags:
@@ -222,6 +222,8 @@ components:
       required:
       - cpu
       - ramGb
+      - tenantId
+      - type
     TerminationAcceptedResponse:
       type: object
       properties:
@@ -279,6 +281,16 @@ components:
           format: date-time
         failureReason:
           type: string
+    ExpiredResourceListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExpiredResourceResponse"
+        count:
+          type: integer
+          format: int32
     ExpiredResourceResponse:
       type: object
       properties:

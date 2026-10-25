@@ -17,31 +17,7 @@ import java.util.EnumMap;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * BR4, FR-50: the explicit lifecycle transition table, implemented AS DATA (a
- * Map&lt;ResourceStatus, Map&lt;ResourceEvent, ResourceStatus&gt;&gt;) rather than inferred from
- * timestamps or from provider_instance_id. A transition is a lookup; an illegal transition is a
- * missing key. This is the implementation — not a description of one elsewhere.
- *
- * <p>Transition table (functional-design.md 6.1):
- * <pre>
- * From           Event                To             Side effect
- * (none)         REQUEST_ACCEPTED     REQUESTED      quota already reserved; row inserted
- * REQUESTED      PROVISION_STARTED    PROVISIONING   -
- * PROVISIONING   INSTANCE_CREATED     PROVISIONING   sets provider_instance_id (self-transition)
- * PROVISIONING   ACTIVATED            ACTIVE         sets activated_at. ONLY path to ACTIVE (BR4)
- * REQUESTED      SAGA_FAILED          FAILED         sets failure_reason
- * PROVISIONING   SAGA_FAILED          FAILED         sets failure_reason (provider_instance_id
- *                                                    already cleared by compensation, A11)
- * ACTIVE         TERMINATE_REQUESTED  TERMINATED     sets terminated_at (BR7 gate 1)
- * TERMINATED     TERMINATE_REQUESTED  TERMINATED     ABSORBING: no effect (FR-21)
- * </pre>
- *
- * <p>The first row (REQUEST_ACCEPTED) is the insert itself, done by ProvisioningService, so it
- * is not an {@link ResourceEvent}. {@link #apply} and {@link #clearInstanceId} are the methods
- * the saga (functional-design.md 9.5) and termination (9.6) call to mutate a {@code Resource}
- * row; they go through {@link #nextStatus}, so every status change is validated against the table.
- */
+/** Allowed resource transitions; missing pairs are rejected with 409. */
 @Component
 public class ResourceLifecycle {
 
@@ -92,6 +68,20 @@ public class ResourceLifecycle {
         return Collections.unmodifiableMap(row);
     }
 
+    @Transactional
+    public void begin(UUID resourceId) {
+        if (load(resourceId).getStatus().equals(ResourceStatus.REQUESTED.name())) {
+            applyInternal(resourceId, ResourceEvent.PROVISION_STARTED, null);
+        }
+    }
+
+    @Transactional
+    public void fail(UUID resourceId, String reason) {
+        if (!load(resourceId).getStatus().equals(ResourceStatus.FAILED.name())) {
+            applyInternal(resourceId, ResourceEvent.SAGA_FAILED, reason);
+        }
+    }
+
     /** Is {@code event} legal from {@code current}? Used by TerminationService before the DB gate. */
     public boolean canTransition(ResourceStatus current, ResourceEvent event) {
         return transitions.getOrDefault(current, Map.of()).containsKey(event);
@@ -108,33 +98,13 @@ public class ResourceLifecycle {
         return next;
     }
 
-    /**
-     * Apply a no-argument transition: look up the resource, validate the transition, set
-     * {@code status} and whichever timestamp the event implies (activatedAt for ACTIVATED,
-     * terminatedAt for TERMINATE_REQUESTED), then save. Called from ProvisioningSaga /
-     * TerminationService for events that carry no extra data.
-     *
-     * <p>Throws IllegalStateTransitionException (409, naming currentStatus) on an illegal
-     * transition; inside the saga this is "a bug or a late duplicate task" (functional-design.md 6.3)
-     * and is handled there as a saga failure.
-     */
+
     @Transactional
     public void apply(UUID resourceId, ResourceEvent event) {
         applyInternal(resourceId, event, null);
     }
 
-    /**
-     * Apply a transition that carries one extra string. The meaning of {@code detail} depends
-     * on the event (functional-design.md 9.5):
-     * <ul>
-     *   <li>{@code INSTANCE_CREATED} -> {@code detail} is the provider instance id; sets
-     *       {@code provider_instance_id} (AC-3.1 — the self-transition's whole point)
-     *   <li>{@code SAGA_FAILED} -> {@code detail} is the failure reason (from
-     *       {@link FailureReason#of}); sets {@code failure_reason}
-     * </ul>
-     * Both calls are the same three-argument shape in the saga code, which is why this is one
-     * method rather than two same-signature overloads.
-     */
+    /** Detail is the instance ID for INSTANCE_CREATED and the reason for SAGA_FAILED. */
     @Transactional
     public void apply(UUID resourceId, ResourceEvent event, String detail) {
         applyInternal(resourceId, event, detail);

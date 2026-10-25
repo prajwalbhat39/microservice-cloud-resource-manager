@@ -8,12 +8,7 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * Maps {@code reservations}: the request-level async handle returned by the 202 (FR-14, FR-16).
- * {@code updatedAt} has exactly one writer: {@code ReservationService.complete}/{@code .fail},
- * which set status + failureReason + updatedAt in one UPDATE. No trigger — see
- * functional-design.md 9.5.
- */
+/** ReservationService writes status, failure reason and updatedAt together. */
 @Entity
 @Table(name = "reservations")
 public class Reservation {

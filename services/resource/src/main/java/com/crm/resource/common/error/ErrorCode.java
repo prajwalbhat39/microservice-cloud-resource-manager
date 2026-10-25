@@ -1,16 +1,6 @@
 package com.crm.resource.common.error;
 
-/**
- * The complete {@code code} vocabulary (nfr-design.md 2.2), copied verbatim from Quota so the
- * vocabulary is identical across services (NFR-5 permits duplication of this small file; a
- * shared library is what is forbidden).
- *
- * <p>Orchestrator emits: VALIDATION_FAILED, MALFORMED_REQUEST, IDEMPOTENCY_KEY_REQUIRED,
- * TENANT_NOT_FOUND (propagated), RESOURCE_NOT_FOUND, RESERVATION_NOT_FOUND,
- * INVALID_STATE_TRANSITION, QUOTA_EXCEEDED (propagated), TIER_FORBIDS_RESOURCE_TYPE
- * (propagated), IDEMPOTENCY_PAYLOAD_MISMATCH, DOWNSTREAM_UNAVAILABLE, PROVIDER_UNAVAILABLE,
- * BILLING_UNAVAILABLE, NOTIFICATION_UNAVAILABLE, METHOD_NOT_ALLOWED, INTERNAL_ERROR.
- */
+/** Problem codes and HTTP statuses used by the Resource API. */
 public enum ErrorCode {
 
     // 400

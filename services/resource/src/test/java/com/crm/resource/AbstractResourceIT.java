@@ -10,8 +10,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -23,29 +21,12 @@ import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathMatching;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
 
-/**
- * Shared harness for the orchestrator's database-backed tests: a real PostgreSQL (so the
- * duplicate-key recovery and the conditional UPDATE are genuinely exercised, not emulated) plus
- * one WireMock standing in for all four peers, as in infrastructure-design.md 8.
- *
- * <p>Quota is a real peer in U1, but these tests are about the ORCHESTRATOR's guards, so stubbing
- * it keeps each test's failure pointing at one service. Quota's own rules are proven by
- * {@code Br1ConcurrencyIT} and {@code Br7ReleaseExactlyOnceIT} in that service's own build.
- *
- * <p>Every subclass is skipped automatically when Docker is not available.
- */
-@Testcontainers(disabledWithoutDocker = true)
+/** Use real PostgreSQL for persistence semantics and WireMock for peer responses. */
+@org.junit.jupiter.api.condition.EnabledIf("com.crm.resource.PostgresSingleton#available")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 abstract class AbstractResourceIT {
 
-    /**
-     * One WireMock for the whole JVM, deliberately NOT stopped in {@code @AfterAll}.
-     *
-     * <p>All three IT classes share one Spring context (same annotations, same property source),
-     * so Spring caches and reuses it — including the peer base-urls resolved on first use. Were
-     * this stopped after the first class, the reused context would keep pointing at a dead port
-     * and every later class would fail with a connection error. The JVM exiting is the cleanup.
-     */
+    /** Keep WireMock alive while cached Spring contexts retain its peer URLs. */
     static WireMockServer peers;
 
     static synchronized void startPeers() {
@@ -61,10 +42,9 @@ abstract class AbstractResourceIT {
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
-        PostgreSQLContainer<?> postgres = PostgresSingleton.INSTANCE;
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
+        registry.add("spring.datasource.url", PostgresSingleton::url);
+        registry.add("spring.datasource.username", PostgresSingleton::username);
+        registry.add("spring.datasource.password", PostgresSingleton::password);
 
         startPeers();
         String peerUrl = "http://localhost:" + peers.port();

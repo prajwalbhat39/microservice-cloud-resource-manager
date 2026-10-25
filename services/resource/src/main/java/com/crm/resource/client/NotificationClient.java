@@ -11,16 +11,7 @@ import org.springframework.web.client.RestClient;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/**
- * Stubbed against WireMock in U1. Real implementation is U4 (Siddharth)'s Notification service.
- * Best-effort ONLY (FR-32, FR-33): a failure here is logged at ERROR and MUST NOT trigger saga
- * compensation or be re-thrown into the saga's catch block — notification sits outside the
- * compensation path by design (it must never roll back a provisioned, paid-for resource).
- *
- * <p>This class just makes the call and lets a failure propagate as a normal exception. Swallowing
- * is the CALLER's job ({@code ProvisioningSaga.notifyQuietly}, {@code TerminationTeardown}), so
- * the "never unwind a resource over a notification" rule lives at the one place that could unwind.
- */
+/** Notification errors propagate to the caller, which logs them without undoing resource changes. */
 @Component
 public class NotificationClient {
 

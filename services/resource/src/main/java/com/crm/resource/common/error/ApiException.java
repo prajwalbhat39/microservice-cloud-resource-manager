@@ -2,7 +2,7 @@ package com.crm.resource.common.error;
 
 import java.util.Map;
 
-/** Abstract root of every anticipated API failure. Copied from Quota (NFR-5). */
+/** Extensions become RFC 9457 problem members, such as {@code exhausted}. */
 public abstract class ApiException extends RuntimeException {
 
     private final ErrorCode code;
