@@ -27,3 +27,8 @@ Thumbs.db
 # WireMock runtime
 scripts/wiremock/__files/
 wiremock-*.log
+
+logs/
+
+# Local Word reference documents
+*.docx

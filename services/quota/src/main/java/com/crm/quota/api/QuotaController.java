@@ -47,7 +47,7 @@ public class QuotaController {
             @ApiResponse(responseCode = "404", description = "QUOTA_RESERVATION_NOT_FOUND")
     })
     @PostMapping("/reservations/{resourceId}/release")
-    public ReleaseQuotaResponse release(@PathVariable String resourceId) {
+    public ReleaseQuotaResponse release(@PathVariable @jakarta.validation.constraints.Size(max = 64) String resourceId) {
         return quotaService.release(resourceId);
     }
 }

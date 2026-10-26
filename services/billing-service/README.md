@@ -1,84 +1,42 @@
-# Billing Service (Unit U2)
+# Billing
 
-Spring Boot service for billing meters and cost computation.
-
-## Port and Database
-- Port: `8083`
-- Database: `billing_db`
-
-## Configuration
-- `DEFAULT_CPU_RATE` (default `0.13`): applied when `ratePerCpuHour` is not sent in start request.
-- `BILLING_FAILURE_RATE` (default `0`): random failure rate for `POST /api/v1/billing/meters`.
-  - `0` = never fail
-  - `1` = always fail
-- `X-Simulate-Failure: true` header on start-meter always returns `503`.
-
-## APIs
-Base path: `/api/v1/billing`
-
-### Start meter (idempotent on `resourceId`)
-`POST /meters`
-
-```json
-{
-  "resourceId": "res-123",
-  "tenantId": "tenant-a",
-  "cpu": 2,
-  "ratePerCpuHour": 0.13
-}
-```
-
-Returns:
-- `201` when meter created
-- `200` when same `resourceId` is replayed
-
-### Stop meter (idempotent)
-`POST /meters/{resourceId}/stop`
-
-Returns `200` and keeps original stop timestamp on repeated calls.
-
-### Read meter and current cost
-`GET /meters/{resourceId}`
-
-### Tenant month cost
-`GET /tenants/{tenantId}/cost?period=YYYY-MM`
-
-- `period` is required.
-- Invalid format returns `400`.
-
-## Cost Formula
-Cost is computed as:
-
-`cpu * ratePerCpuHour * activeSeconds / 3600`
-
-- Prorated per second.
-- Uses `BigDecimal` only (no float/double storage for money).
-
-## BR5
-Billing stops when a resource is terminated by calling:
-
-`POST /api/v1/billing/meters/{resourceId}/stop`
+Port 8083, database `billing_db`, role `billing_user`. Start and stop resource meters and calculate
+cost with decimal arithmetic. The default rate is 0.12 per CPU-hour.
 
 ## Run
-```bash
-cd billing-service
+
+Create the database using `scripts/db/setup-u2-u4.sql`, then run from this directory:
+
+```sh
 ./mvnw spring-boot:run
 ```
 
-If wrapper is not present:
+On Windows use `mvnw.cmd`. Configuration: `SERVER_PORT` defaults to 8083; `DB_HOST`/`DB_PORT` to
+localhost/5432; `DB_NAME` to billing_db; `DB_USER` to billing_user; `DB_PASSWORD` to changeme.
+`DEFAULT_CPU_RATE` defaults to 0.12 and `BILLING_FAILURE_RATE` to 0.
 
-```bash
-mvn spring-boot:run
-```
+## API
+
+| Method | Path | Behavior |
+|---|---|---|
+| POST | `/api/v1/billing/meters` | Start by resourceId; 201 new, 200 replay |
+| POST | `/api/v1/billing/meters/{resourceId}/stop` | Idempotent stop; unknown meter returns 404 and prevents a late start |
+| GET | `/api/v1/billing/meters/{resourceId}` | Meter and current cost |
+| GET | `/api/v1/billing/tenants/{tenantId}/cost?period=YYYY-MM` | UTC calendar-month total |
+| GET | `/health` | Database-aware health |
+| GET | `/v3/api-docs.yaml` | Generated API specification |
+
+Start requests contain `resourceId`, `tenantId`, `cpu` and optional `ratePerCpuHour`.
+Rates must fit NUMERIC(10,4). Cost is `cpu * rate * elapsedSeconds / 3600`, rounded to six decimal
+places. Stops preserve the first timestamp and cost. Concurrent starts/stops have one local
+business effect. A cancelled start returns 409.
+
+`X-Simulate-Failure: true` or `always-fail` forces a new start to return 503. Persisted replays
+return the existing meter before simulation. Failure injection is intended for new operations.
 
 ## Test
-```bash
-cd billing-service
-mvn test
-```
 
-## Health and OpenAPI
-- Health: `GET /health`
-- OpenAPI endpoint: `GET /v3/api-docs.yaml`
-- Committed spec file: `openapi.yaml`
-
+Set `BILLING_TEST_DB_URL` to a dedicated PostgreSQL database; credentials default to billing_user
+and changeme, overridden by `BILLING_TEST_DB_USER` and `BILLING_TEST_DB_PASSWORD`. Run `./mvnw verify`.
+The suite includes a database-free stopped-cost check, HTTP validation and PostgreSQL lifecycle,
+concurrent start/stop, replay and late-start cancellation tests. See the root README for setup.

@@ -37,22 +37,13 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * BR6, Challenge 3C. WireMock stands in for Provider, Billing and Notification; the real clients
- * (and the real retry policy) run against it, so the retry-then-compensate path is genuinely
- * exercised rather than mocked away.
- *
- * <p>The lifecycle and reservation writers are Mockito mocks: this test is about the ORDER and
- * the SELECTION of compensating calls (functional-design.md 9.5), so what matters is which
- * transitions and which peer calls were made. The database effects those transitions produce are
- * asserted by {@code TerminationIdempotencyIT} and the Challenge 3C script.
- */
 class ProvisioningSagaCompensationTest {
 
     private WireMockServer wireMock;
     private ResourceLifecycle lifecycle;
     private ReservationService reservationService;
     private ProvisioningSaga saga;
+    private ResourceWork work;
 
     private final UUID resourceId = UUID.fromString("e5f1a2b3-1111-4c2d-8e3f-9a0b1c2d3e4f");
     private final UUID reservationId = UUID.fromString("3b9a1c2d-4e5f-4a6b-8c7d-9e0f1a2b3c4d");
@@ -63,12 +54,11 @@ class ProvisioningSagaCompensationTest {
         wireMock.start();
 
         String baseUrl = "http://localhost:" + wireMock.port();
-        // Two attempts and a 1 ms backoff: the retry policy is proven by PeerRetry's own
-        // behaviour, and a real 200 ms/400 ms backoff would only slow this test down.
         PeerRetry retry = new PeerRetry(2, 1, 2.0, 2, 0.0);
 
         lifecycle = mock(ResourceLifecycle.class);
         reservationService = mock(ReservationService.class);
+        work = mock(ResourceWork.class);
 
         saga = new ProvisioningSaga(
                 lifecycle,
@@ -76,16 +66,9 @@ class ProvisioningSagaCompensationTest {
                 new BillingClient(peerBuilder(baseUrl), retry),
                 new QuotaClient(peerBuilder(baseUrl), retry),
                 new NotificationClient(peerBuilder(baseUrl), retry),
-                reservationService,
-                new BigDecimal("0.12"));
+                new BigDecimal("0.12"), work, new ProvisioningCompletion(lifecycle, reservationService, work));
     }
 
-    /**
-     * Builds a peer client the same way {@code RestClientConfig.peerClient} does — in particular
-     * on {@link SimpleClientHttpRequestFactory}, which speaks HTTP/1.1. The default
-     * {@code RestClient.builder()} would pick the JDK HttpClient, attempt an h2c upgrade and be
-     * reset by WireMock's Jetty, so matching production here is both correct and necessary.
-     */
     private static RestClient.Builder peerBuilder(String baseUrl) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofSeconds(2));
@@ -93,7 +76,6 @@ class ProvisioningSagaCompensationTest {
         return RestClient.builder()
                 .baseUrl(baseUrl)
                 .requestFactory(factory)
-                // Mirrors the correlation-id initializer the real builders carry (nfr-design 3.2).
                 .requestInitializer(request -> {
                     String id = org.slf4j.MDC.get(CorrelationIdFilter.MDC_KEY);
                     if (id != null) {
@@ -134,58 +116,42 @@ class ProvisioningSagaCompensationTest {
 
     @Test
     void billingFailureReleasesQuotaAndTerminatesInstance() {
-        // Arrange: provider succeeds, billing meter start is forced to 503 (Challenge 3C),
-        // every compensating call succeeds.
         stubProviderProvisionSucceeds();
         wireMock.stubFor(post(urlPathMatching("/api/v1/billing/meters"))
                 .willReturn(aResponse().withStatus(503)));
         stubCompensationPeersSucceed();
 
-        // Act
         saga.run(task());
 
-        // Assert (reverse order, AC-3.3): the request journal shows the meter stop BEFORE the
-        // instance it meters is deleted, and quota released LAST — releasing it earlier would
-        // let another tenant consume capacity while this instance was still alive.
         List<String> journal = chronologicalJournal();
 
         int meterStop = indexOfMatch(journal, "POST /api/v1/billing/meters/" + resourceId + "/stop");
-        int instanceDelete = indexOfMatch(journal, "DELETE /api/v1/provider/instances/i-mock-7f3a9c21");
+        int instanceDelete = indexOfMatch(journal, "DELETE /api/v1/provider/instances/requests/ct-" + resourceId + "");
         int quotaRelease = indexOfMatch(journal, "POST /api/v1/quota/reservations/" + resourceId + "/release");
 
         assertThat(instanceDelete).as("provider instance must be terminated").isNotEqualTo(-1);
         assertThat(quotaRelease).as("quota must be released (AC-3.4)").isNotEqualTo(-1);
-        // The meter was never started (billing 503 on every attempt), so there is nothing to
-        // stop: meterStarted stayed false and step (1) of compensation is correctly skipped.
-        assertThat(meterStop).as("no meter was ever started, so none is stopped").isEqualTo(-1);
+        assertThat(meterStop).as("stop reconciles a possibly committed meter").isLessThan(instanceDelete);
         assertThat(instanceDelete).isLessThan(quotaRelease);
 
-        // Billing was retried, not given up on after one try (NFR-26).
         wireMock.verify(2, WireMock.postRequestedFor(urlPathMatching("/api/v1/billing/meters")));
 
-        // The failure is recorded as the queryable saga state (AC-3.1, AC-3.5).
         ArgumentCaptor<String> reason = ArgumentCaptor.forClass(String.class);
-        verify(lifecycle).apply(eq(resourceId), eq(ResourceEvent.SAGA_FAILED), reason.capture());
+        verify(lifecycle).fail(eq(resourceId), reason.capture());
         assertThat(reason.getValue()).startsWith("BILLING_UNAVAILABLE:");
 
-        // provider_instance_id is cleared, so the column honestly reads "nothing is running" (A11).
         verify(lifecycle).clearInstanceId(resourceId);
         verify(reservationService).fail(eq(reservationId), reason.capture());
         assertThat(reason.getValue()).startsWith("BILLING_UNAVAILABLE:");
 
-        // The resource never became ACTIVE and the reservation was never completed.
         verify(lifecycle, never()).apply(resourceId, ResourceEvent.ACTIVATED);
         verify(reservationService, never()).complete(any());
 
-        // AC-3.6: the tenant is told.
         assertThat(indexOfMatch(journal, "POST /api/v1/notifications")).isNotEqualTo(-1);
     }
 
     @Test
     void fullReverseOrderWhenEveryForwardStepHadCompleted() {
-        // The only path where ALL THREE compensations run, so it is the only one that can prove
-        // the 3 -> 2 -> 1 ordering of AC-3.3 end to end. Provider and billing both succeed, then
-        // ACTIVATE fails — the "a bug or a late duplicate task" case of functional-design.md 6.3.
         stubProviderProvisionSucceeds();
         wireMock.stubFor(post(urlPathMatching("/api/v1/billing/meters"))
                 .willReturn(aResponse().withStatus(201)));
@@ -200,56 +166,50 @@ class ProvisioningSagaCompensationTest {
 
         List<String> journal = chronologicalJournal();
         int meterStop = indexOfMatch(journal, "POST /api/v1/billing/meters/" + resourceId + "/stop");
-        int instanceDelete = indexOfMatch(journal, "DELETE /api/v1/provider/instances/i-mock-7f3a9c21");
+        int instanceDelete = indexOfMatch(journal, "DELETE /api/v1/provider/instances/requests/ct-" + resourceId + "");
         int quotaRelease = indexOfMatch(journal, "POST /api/v1/quota/reservations/" + resourceId + "/release");
 
         assertThat(meterStop).as("the meter was started, so it must be stopped").isNotEqualTo(-1);
         assertThat(instanceDelete).isNotEqualTo(-1);
         assertThat(quotaRelease).isNotEqualTo(-1);
 
-        // The meter stops BEFORE the instance it meters disappears, otherwise a stopped-meter
-        // call could race a terminated instance and leave an open meter.
         assertThat(meterStop).as("undo step 3 before step 2").isLessThan(instanceDelete);
-        // Quota is released LAST: it is the only undo that is a promise to the tenant, and
-        // releasing it earlier would let another request consume capacity while this instance
-        // was still alive.
         assertThat(instanceDelete).as("undo step 2 before step 1").isLessThan(quotaRelease);
 
-        // A non-peer cause deliberately says nothing about how far the saga got.
         ArgumentCaptor<String> reason = ArgumentCaptor.forClass(String.class);
-        verify(lifecycle).apply(eq(resourceId), eq(ResourceEvent.SAGA_FAILED), reason.capture());
+        verify(lifecycle).fail(eq(resourceId), reason.capture());
         assertThat(reason.getValue()).isEqualTo("INVALID_STATE_TRANSITION: REQUESTED --ACTIVATED--> rejected");
         verify(lifecycle).clearInstanceId(resourceId);
     }
 
-    @Test
-    void aFailingCompensationStepDoesNotStopTheRest() {
-        // "quietly": a compensation that aborts half-way is worse than one that pushes on — the
-        // resource would be left PROVISIONING with quota still held. Here the provider's
-        // terminate call fails outright, and quota must STILL be released.
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"provider", "billing"})
+    void failedCleanupStaysPendingUntilRecoverySucceeds(String peer) {
         stubProviderProvisionSucceeds();
-        wireMock.stubFor(post(urlPathMatching("/api/v1/billing/meters"))
-                .willReturn(aResponse().withStatus(503)));
+        wireMock.stubFor(post(urlPathMatching("/api/v1/billing/meters")).willReturn(aResponse().withStatus(503)));
         stubCompensationPeersSucceed();
-        wireMock.stubFor(delete(urlPathMatching("/api/v1/provider/instances/.*"))
-                .willReturn(aResponse().withStatus(500)));
+        if (peer.equals("provider")) {
+            wireMock.stubFor(delete(urlPathMatching("/api/v1/provider/instances/.*")).willReturn(aResponse().withStatus(500)));
+        } else {
+            wireMock.stubFor(post(urlPathMatching("/api/v1/billing/meters/.*/stop")).willReturn(aResponse().withStatus(503)));
+        }
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> saga.run(task())).isInstanceOf(RuntimeException.class);
+        verify(work).enqueue(eq(resourceId), eq("COMPENSATE"), any());
+        wireMock.verify(WireMock.deleteRequestedFor(urlPathMatching("/api/v1/provider/instances/requests/.*")));
+        wireMock.verify(WireMock.postRequestedFor(urlPathMatching("/api/v1/billing/meters/.*/stop")));
+        verify(lifecycle, never()).clearInstanceId(any());
+        verify(reservationService, never()).fail(any(), any());
+        assertThat(chronologicalJournal()).noneMatch(entry -> entry.contains("/release"));
 
-        saga.run(task());
-
-        assertThat(indexOfMatch(chronologicalJournal(),
-                "POST /api/v1/quota/reservations/" + resourceId + "/release"))
-                .as("quota is released even though the provider undo failed")
-                .isNotEqualTo(-1);
-
-        ArgumentCaptor<String> reason = ArgumentCaptor.forClass(String.class);
-        verify(lifecycle).apply(eq(resourceId), eq(ResourceEvent.SAGA_FAILED), reason.capture());
-        assertThat(reason.getValue()).startsWith("BILLING_UNAVAILABLE:");
+        stubCompensationPeersSucceed();
+        saga.compensate(new ResourceWork.Compensation(task(), "BILLING_UNAVAILABLE: retry"));
+        verify(lifecycle).clearInstanceId(resourceId);
         verify(reservationService).fail(eq(reservationId), any());
+        verify(work).done(resourceId);
     }
 
     @Test
-    void providerFailureNeverStartsBillingOrClearsAnInstanceId() {
-        // Provider itself fails before an instance ever exists.
+    void providerFailureCancelsUnacknowledgedPeerEffects() {
         wireMock.stubFor(post(urlPathMatching("/api/v1/provider/instances"))
                 .willReturn(aResponse().withStatus(503)));
         stubCompensationPeersSucceed();
@@ -258,26 +218,21 @@ class ProvisioningSagaCompensationTest {
 
         List<String> journal = chronologicalJournal();
 
-        // instanceId == null, so the provider-terminate step is skipped and the instance id is
-        // never cleared (there was none). meterStarted == false, so no meter stop either.
-        assertThat(journal).noneMatch(entry -> entry.startsWith("DELETE /api/v1/provider/instances"));
-        assertThat(journal).noneMatch(entry -> entry.startsWith("POST /api/v1/billing/meters"));
-        verify(lifecycle, never()).clearInstanceId(any());
+        assertThat(journal).anyMatch(entry -> entry.startsWith("DELETE /api/v1/provider/instances/requests"));
+        assertThat(journal).noneMatch(entry -> entry.equals("POST /api/v1/billing/meters"));
+        verify(lifecycle).clearInstanceId(resourceId);
         verify(lifecycle, never()).apply(eq(resourceId), eq(ResourceEvent.INSTANCE_CREATED), any());
 
-        // Only quota is released — the one step that did complete before the failure.
         assertThat(indexOfMatch(journal, "POST /api/v1/quota/reservations/" + resourceId + "/release"))
                 .isNotEqualTo(-1);
 
         ArgumentCaptor<String> reason = ArgumentCaptor.forClass(String.class);
-        verify(lifecycle).apply(eq(resourceId), eq(ResourceEvent.SAGA_FAILED), reason.capture());
+        verify(lifecycle).fail(eq(resourceId), reason.capture());
         assertThat(reason.getValue()).startsWith("PROVIDER_UNAVAILABLE:");
     }
 
     @Test
     void happyPathActivatesAndCompensatesNothing() {
-        // The control case: with every peer healthy nothing is undone, the resource reaches
-        // ACTIVE through the only transition that leads there (BR4), and the reservation completes.
         stubProviderProvisionSucceeds();
         wireMock.stubFor(post(urlPathMatching("/api/v1/billing/meters"))
                 .willReturn(aResponse().withStatus(201)));
@@ -286,12 +241,12 @@ class ProvisioningSagaCompensationTest {
         saga.run(new ProvisioningTask(reservationId, resourceId, "tnt-std-001", "VM", 4, 8,
                 SimulateFailureDirective.none(), "corr-happy-001"));
 
-        verify(lifecycle).apply(resourceId, ResourceEvent.PROVISION_STARTED);
+        verify(lifecycle).begin(resourceId);
         verify(lifecycle).apply(resourceId, ResourceEvent.INSTANCE_CREATED, "i-mock-7f3a9c21");
         verify(lifecycle).apply(resourceId, ResourceEvent.ACTIVATED);
         verify(reservationService).complete(reservationId);
 
-        verify(lifecycle, never()).apply(eq(resourceId), eq(ResourceEvent.SAGA_FAILED), any());
+        verify(lifecycle, never()).fail(eq(resourceId), any());
         verify(lifecycle, never()).clearInstanceId(any());
 
         List<String> journal = chronologicalJournal();
@@ -301,8 +256,6 @@ class ProvisioningSagaCompensationTest {
 
     @Test
     void aNotificationFailureNeverTriggersCompensation() {
-        // FR-33: notification sits OUTSIDE the compensation path. A failing notifier must not
-        // roll back a provisioned, paid-for resource.
         stubProviderProvisionSucceeds();
         wireMock.stubFor(post(urlPathMatching("/api/v1/billing/meters"))
                 .willReturn(aResponse().withStatus(201)));
@@ -318,7 +271,7 @@ class ProvisioningSagaCompensationTest {
 
         verify(lifecycle).apply(resourceId, ResourceEvent.ACTIVATED);
         verify(reservationService).complete(reservationId);
-        verify(lifecycle, never()).apply(eq(resourceId), eq(ResourceEvent.SAGA_FAILED), any());
+        verify(lifecycle, never()).fail(eq(resourceId), any());
 
         List<String> journal = chronologicalJournal();
         assertThat(journal).noneMatch(entry -> entry.contains("/release"));
@@ -326,8 +279,7 @@ class ProvisioningSagaCompensationTest {
 
     @Test
     void correlationIdCrossesTheAsyncBoundaryOntoPeerCalls() {
-        // nfr-design.md 3.3: the saga re-seeds the MDC from the task's correlationId field, and
-        // the RestClient initializer puts it on every outbound call. One trace, both halves.
+        org.slf4j.MDC.put(CorrelationIdFilter.MDC_KEY, "recovery-sweep");
         stubProviderProvisionSucceeds();
         wireMock.stubFor(post(urlPathMatching("/api/v1/billing/meters"))
                 .willReturn(aResponse().withStatus(201)));
@@ -335,6 +287,7 @@ class ProvisioningSagaCompensationTest {
 
         saga.run(new ProvisioningTask(reservationId, resourceId, "tnt-std-001", "VM", 4, 8,
                 SimulateFailureDirective.none(), "corr-trace-001"));
+        assertThat(org.slf4j.MDC.get(CorrelationIdFilter.MDC_KEY)).isEqualTo("recovery-sweep");
 
         List<LoggedRequest> providerCalls = wireMock.findAll(
                 WireMock.postRequestedFor(urlPathMatching("/api/v1/provider/instances")));
@@ -344,8 +297,6 @@ class ProvisioningSagaCompensationTest {
 
     @Test
     void theSimulateDirectiveIsReplayedOntoTheRightPeerOnly() {
-        // FR-46: "billing:always-fail" must reach Billing and NOT Provider, even though the
-        // header itself died with the client's HTTP exchange at the 202.
         stubProviderProvisionSucceeds();
         wireMock.stubFor(post(urlPathMatching("/api/v1/billing/meters"))
                 .willReturn(aResponse().withStatus(503)));
@@ -363,13 +314,6 @@ class ProvisioningSagaCompensationTest {
         return journal.indexOf(entry);
     }
 
-    /**
-     * The request journal in the order the calls actually happened.
-     *
-     * <p>{@code getAllServeEvents()} returns events NEWEST-FIRST, so it has to be reversed before
-     * any ordering assertion. Reading it raw would invert every "A happened before B" check —
-     * and would have quietly reported the compensation order as correct if it were reversed.
-     */
     private List<String> chronologicalJournal() {
         List<String> entries = new java.util.ArrayList<>(wireMock.getAllServeEvents().stream()
                 .map(event -> event.getRequest().getMethod().value() + " " + event.getRequest().getUrl())

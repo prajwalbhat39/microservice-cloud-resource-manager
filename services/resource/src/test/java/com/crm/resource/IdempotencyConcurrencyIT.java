@@ -24,17 +24,7 @@ import java.util.concurrent.TimeUnit;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathMatching;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * BR2 database-backed test (Testcontainers, real PostgreSQL). This is the test that proves the
- * guard {@code IdempotencyServiceTest} can only stub: ten genuinely simultaneous duplicates
- * racing for one primary key, where the loser must block on the uncommitted key and then replay
- * the winner's stored answer (functional-design.md 9.2).
- *
- * <p>It is also what caught two defects that every mock-based test passed straight through: the
- * repository issuing {@code merge} (UPDATE) instead of {@code persist} (INSERT), which made the
- * key guard inert, and the attempt to recover from the constraint violation inside the
- * transaction, which left it marked rollback-only and turned every replay into a 500.
- */
+/** Concurrent duplicate keys return one stored response and create one resource. */
 class IdempotencyConcurrencyIT extends AbstractResourceIT {
 
     private static final int CONCURRENT_DUPLICATES = 10;
@@ -112,13 +102,16 @@ class IdempotencyConcurrencyIT extends AbstractResourceIT {
 
         // ...and at the peer: exactly ONE quota reservation was taken, not ten. This is the
         // assertion that would fail if quota were reserved before the idempotency insert.
-        peers.verify(1, WireMock.postRequestedFor(urlPathMatching("/api/v1/quota/reservations")));
+        peers.verify(1, WireMock.postRequestedFor(urlPathMatching("/api/v1/quota/reservations"))
+                .withRequestBody(WireMock.matchingJsonPath("$.tenantId", WireMock.equalTo(tenantId))));
 
         // The saga ran once too (the resource ends ACTIVE, the only path to which is BR4's).
         awaitUntil(Duration.ofSeconds(20), "the saga to finish", () ->
                 resourceRepository.findByTenantIdAndStatus(tenantId, "ACTIVE").size() == 1);
-        peers.verify(1, WireMock.postRequestedFor(urlPathMatching("/api/v1/provider/instances")));
-        peers.verify(1, WireMock.postRequestedFor(urlPathMatching("/api/v1/billing/meters")));
+        peers.verify(1, WireMock.postRequestedFor(urlPathMatching("/api/v1/provider/instances"))
+                .withRequestBody(WireMock.matchingJsonPath("$.clientToken", WireMock.equalTo("ct-" + resourceIds.getFirst()))));
+        peers.verify(1, WireMock.postRequestedFor(urlPathMatching("/api/v1/billing/meters"))
+                .withRequestBody(WireMock.matchingJsonPath("$.resourceId", WireMock.equalTo(resourceIds.getFirst()))));
     }
 
     @Test
@@ -143,7 +136,8 @@ class IdempotencyConcurrencyIT extends AbstractResourceIT {
 
         // No second reservation, no second resource.
         assertThat(resourceRepository.findByTenantId(tenantId)).hasSize(1);
-        peers.verify(1, WireMock.postRequestedFor(urlPathMatching("/api/v1/quota/reservations")));
+        peers.verify(1, WireMock.postRequestedFor(urlPathMatching("/api/v1/quota/reservations"))
+                .withRequestBody(WireMock.matchingJsonPath("$.tenantId", WireMock.equalTo(tenantId))));
     }
 
     @Test

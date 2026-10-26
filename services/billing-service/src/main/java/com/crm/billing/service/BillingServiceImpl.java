@@ -20,11 +20,16 @@ import java.util.List;
 import java.util.UUID;
 import java.util.function.DoubleSupplier;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class BillingServiceImpl implements BillingService {
 
+    private static final Logger log = LoggerFactory.getLogger(BillingServiceImpl.class);
+    private final JdbcTemplate jdbc;
     private static final BigDecimal SECONDS_PER_HOUR = BigDecimal.valueOf(3600);
 
     private final BillingMeterRepository meterRepository;
@@ -37,7 +42,8 @@ public class BillingServiceImpl implements BillingService {
                               BillingEventRepository eventRepository,
                               BillingProperties billingProperties,
                               Clock billingClock,
-                              DoubleSupplier failureRandomSupplier) {
+                              DoubleSupplier failureRandomSupplier, JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
         this.meterRepository = meterRepository;
         this.eventRepository = eventRepository;
         this.billingProperties = billingProperties;
@@ -48,11 +54,17 @@ public class BillingServiceImpl implements BillingService {
     @Override
     @Transactional
     public StartMeterResult startMeter(StartMeterCommand command, boolean simulateFailure) {
-        maybeFail(simulateFailure);
-
+        lock(command.resourceId());
         return meterRepository.findByResourceId(command.resourceId())
-            .map(existing -> new StartMeterResult(toMeterView(existing), false))
+            .map(existing -> {
+                log.info("billing.meter.replayed resourceId={}", command.resourceId());
+                return new StartMeterResult(toMeterView(existing), false);
+            })
             .orElseGet(() -> {
+                if (Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM billing_stops WHERE resource_id = ?)", Boolean.class, command.resourceId()))) {
+                    throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT, "Meter start was cancelled");
+                }
+                maybeFail(simulateFailure);
                 Instant now = Instant.now(clock);
                 BillingMeter meter = new BillingMeter(
                     UUID.randomUUID(),
@@ -67,19 +79,23 @@ public class BillingServiceImpl implements BillingService {
 
                 BillingMeter saved = meterRepository.save(meter);
                 eventRepository.save(new BillingEvent(null, command.resourceId(), EventType.START, now));
+                log.info("billing.meter.started resourceId={}", command.resourceId());
                 return new StartMeterResult(toMeterView(saved), true);
             });
     }
 
     @Override
-    @Transactional
+    @Transactional(noRollbackFor = NotFoundException.class)
     public MeterView stopMeter(String resourceId) {
+        lock(resourceId);
+        jdbc.update("INSERT INTO billing_stops(resource_id) VALUES (?) ON CONFLICT DO NOTHING", resourceId);
         BillingMeter meter = meterRepository.findByResourceId(resourceId)
             .orElseThrow(() -> new NotFoundException("Meter not found for resourceId " + resourceId));
 
         if (!meter.isStopped()) {
             Instant now = Instant.now(clock);
             meter.stop(now);
+            log.info("billing.meter.stopped resourceId={}", resourceId);
             meterRepository.save(meter);
             eventRepository.save(new BillingEvent(null, resourceId, EventType.STOP, now));
         }
@@ -176,5 +192,9 @@ public class BillingServiceImpl implements BillingService {
             .multiply(BigDecimal.valueOf(seconds))
             .divide(SECONDS_PER_HOUR, 6, RoundingMode.HALF_UP);
     }
+    private void lock(String resourceId) {
+        jdbc.query("SELECT pg_advisory_xact_lock(hashtext(?))", rs -> { }, resourceId);
+    }
+
 }
 

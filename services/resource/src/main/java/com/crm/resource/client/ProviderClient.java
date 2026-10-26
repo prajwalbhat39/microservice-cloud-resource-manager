@@ -12,20 +12,7 @@ import org.springframework.web.client.RestClient;
 
 import java.util.Map;
 
-/**
- * Stubbed against WireMock in U1 (see infrastructure-design.md 8 for the mapping, including the
- * forced-503 billing stub — this client's own 503 path exercises the same retry/compensation
- * logic). Real implementation is U3 (Vinayak)'s Provider mock service.
- *
- * <p>Every attempt carries the same {@link ClientToken#of} token, which is what makes a RETRIED
- * provision call return the EXISTING instance instead of creating a second one (FR-19, NFR-27) —
- * the provider mock is idempotent on this token. Without it, a timed-out-but-successful provision
- * followed by a retry would leak an instance the orchestrator does not know about.
- *
- * <p>Retry-with-backoff-and-jitter (nfr-design.md 8) applies to timeouts, connection failures and
- * 503 only, never to a 4xx. Exhausted retries surface as PROVIDER_UNAVAILABLE, which becomes the
- * {@code failure_reason} prefix the saga writes (functional-design.md 9.5).
- */
+/** Retry with the same client token to recover an instance created before a lost response. */
 @Component
 public class ProviderClient {
 
@@ -93,6 +80,14 @@ public class ProviderClient {
                                     ErrorCode.PROVIDER_UNAVAILABLE,
                                     "provider terminate rejected (" + status + ")");
                         }));
+    }
+
+    public void cancel(String clientToken) {
+        retry.callVoid(ErrorCode.PROVIDER_UNAVAILABLE, "provider cancel", true, () -> {
+            restClient.delete().uri("/api/v1/provider/instances/requests/{token}", clientToken)
+                    .retrieve().toBodilessEntity();
+            log.info("provider.cancelled clientToken={}", clientToken);
+        });
     }
 
     /** Mirrors the provider mock's 201 body: {@code { "instanceId": "i-mock-...", "status": "ACTIVE" }}. */

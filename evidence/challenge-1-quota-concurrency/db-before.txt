@@ -1,12 +1,12 @@
-CHALLENGE 1 - DB STATE BEFORE  (2026-10-24 12:12:29 UTC)
-tenant: tnt-br1-20261024-121229
+CHALLENGE 1 - DB STATE BEFORE  (2026-10-25 07:28:59 UTC)
+tenant: tnt-br1-20261025-072859
 
-        tenant_id        | cpu_used | cpu_limit | ram_used_gb | ram_limit_gb | instance_used | instance_limit 
+        tenant_id        | cpu_used | cpu_limit | ram_used_gb | ram_limit_gb | instance_used | instance_limit
 -------------------------+----------+-----------+-------------+--------------+---------------+----------------
- tnt-br1-20261024-121229 |        0 |        20 |           0 |           64 |             0 |             10
+ tnt-br1-20261025-072859 |        0 |        20 |           0 |           64 |             0 |             10
 (1 row)
 
- reserved_ledger_rows 
+ reserved_ledger_rows
 ----------------------
                     0
 (1 row)

@@ -30,28 +30,7 @@ import java.time.Instant;
 import java.util.Locale;
 import java.util.UUID;
 
-/**
- * FR-13, FR-14: the SYNCHRONOUS half of provisioning. Quota is reserved HERE, before the 202, so
- * the Challenge 1 count is deterministic (AC-1.2). Everything after the 202 (provider, billing,
- * notify) is {@link ProvisioningSaga}'s job, dispatched only after this transaction commits.
- *
- * <p>========================= BUILDING BLOCKS ALREADY CREATED =========================
- * <ul>
- *   <li>{@code idempotencyService} — IdempotencyService.beginOrReplay(key, fingerprint,
- *       candidateReservationId) -&gt; IdempotencyDecision; .complete(key, status, body)
- *   <li>{@code quotaClient} — QuotaClient.reserve(tenantId, resourceId, type, cpu, ramGb) -&gt;
- *       ReserveQuotaResponseDto, throws ApiException subclasses on 404/422, or
- *       DownstreamUnavailableException on an unreachable peer
- *   <li>{@code resourceRepository} — ResourceRepository (save/findById inherited)
- *   <li>{@code reservationRepository} — ReservationRepository (save/findById inherited)
- *   <li>{@code sagaDispatcher} — SagaDispatcher.afterCommit(ProvisioningTask) — runs the saga
- *       only after THIS transaction commits (never inside it)
- *   <li>RequestFingerprint.of(request) -&gt; String (implement RequestFingerprint first)
- *   <li>SimulateFailureDirective.normalise(headerValue) -&gt; SimulateFailureDirective
- *   <li>ProvisionAcceptedResponse.pending(reservationId, resourceId) — the frozen 202 body shape
- * </ul>
- * ===================================================================================
- */
+/** Reserve quota before accepting; dispatch persisted provisioning work after commit. */
 @Service
 public class ProvisioningService {
 
@@ -64,11 +43,14 @@ public class ProvisioningService {
     private final SagaDispatcher sagaDispatcher;
     private final Clock clock;
     private final ObjectMapper objectMapper;
+    private final ResourceWork work;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     public ProvisioningService(IdempotencyService idempotencyService, QuotaClient quotaClient,
                                ResourceRepository resourceRepository,
                                ReservationRepository reservationRepository,
-                               SagaDispatcher sagaDispatcher, Clock clock, ObjectMapper objectMapper) {
+                               SagaDispatcher sagaDispatcher, Clock clock, ObjectMapper objectMapper, ResourceWork work, org.springframework.jdbc.core.JdbcTemplate jdbc) {
+        this.work = work; this.jdbc = jdbc;
         this.idempotencyService = idempotencyService;
         this.quotaClient = quotaClient;
         this.resourceRepository = resourceRepository;
@@ -78,30 +60,6 @@ public class ProvisioningService {
         this.objectMapper = objectMapper;
     }
 
-    /**
-     * Follow functional-design.md 9.3's five steps EXACTLY, in order — the order is part of the
-     * contract (a request that fails steps 1-2 must never leave a record behind):
-     * <ol>
-     *   <li>(a) fingerprint the request; mint resourceId and reservationId; call
-     *       {@code idempotencyService.beginOrReplay(...)}. If {@code !decision.proceed()},
-     *       return {@code ProvisionOutcome.of(decision)} immediately (replay or in-flight)
-     *   <li>(b) call {@code quotaClient.reserve(...)}. On a BUSINESS rejection (404/422 from
-     *       Quota): call {@code idempotencyService.complete(key, rejectedStatus, rejectedBody)}
-     *       then return {@code ProvisionOutcome.rejected(...)} — the TRANSACTION COMMITS here,
-     *       so the key now owns this answer permanently. On an INFRASTRUCTURE failure
-     *       (DownstreamUnavailableException): let it propagate uncaught — the whole transaction
-     *       rolls back, the idempotency record disappears, the key becomes reusable
-     *   <li>(c) save the Resource (status=REQUESTED) and Reservation (status=PENDING) rows —
-     *       ONLY after quota is held (FR-13: no resource row on a rejected request)
-     *   <li>(d) build {@code ProvisionAcceptedResponse.pending(reservationId, resourceId)},
-     *       call {@code idempotencyService.complete(key, 202, json-of-that-body)} so every
-     *       future replay is byte-identical (AC-2.1)
-     *   <li>(e) {@code sagaDispatcher.afterCommit(new ProvisioningTask(...))} — reads
-     *       {@code MDC.get("correlationId")} for the task's correlationId field
-     * </ol>
-     * {@code durationSeconds} becomes {@code expires_at = created_at + durationSeconds} at
-     * insert (FR-23); absent duration leaves the column null.
-     */
     @Transactional
     public ProvisionOutcome provision(String idempotencyKey, ProvisionResourceRequest request,
                                       String simulateFailureHeader) {
@@ -115,10 +73,13 @@ public class ProvisioningService {
             return ProvisionOutcome.of(decision);
         }
 
+        jdbc.query("SELECT pg_advisory_xact_lock(hashtext(?))", rs -> { }, resourceId.toString());
+        work.rememberQuota(resourceId);
+
         // (b) Quota reserved SYNCHRONOUSLY, before the response. The Challenge 1 count is decided here.
         try {
             ReserveQuotaResponseDto quota = quotaClient.reserve(
-                    request.tenantId(), resourceId, request.type(), request.cpu(), request.ramGb());
+                    request.tenantId().trim(), resourceId, request.type().trim().toUpperCase(Locale.ROOT), request.cpu(), request.ramGb());
             log.info("quota.reserved resourceId={} tenantId={} replay={}", resourceId, request.tenantId(), quota.replay());
         } catch (DownstreamUnavailableException unavailable) {
             // Infrastructure failure: not an answer. Propagate so the whole transaction rolls back,
@@ -127,6 +88,7 @@ public class ProvisioningService {
         } catch (ApiException rejected) {
             // Business rejection (404 tenant / 422 quota / 422 BR8) from Quota. Freeze the answer on
             // the key; the transaction COMMITS so the key owns this answer.
+            work.done(resourceId);
             int status = rejected.code().status();
             String body = rejectionBody(rejected, status);
             idempotencyService.complete(idempotencyKey, status, body);
@@ -158,12 +120,7 @@ public class ProvisioningService {
         return ProvisionOutcome.accepted(body);
     }
 
-    /**
-     * Builds the problem document for a peer's business rejection through the one construction
-     * point (ProblemDetailsFactory), keeping code/title/detail/extensions (nfr-design.md 2.4) and
-     * pointing {@code instance} at this service's own path. The text is stored on the key and
-     * later replayed verbatim.
-     */
+    /** Store the peer business rejection for byte-identical replay. */
     private String rejectionBody(ApiException rejected, int status) {
         ProblemDetail pd = ProblemDetailsFactory.problem(rejected.code(), status, rejected.getMessage(),
                 null, rejected.extensions());

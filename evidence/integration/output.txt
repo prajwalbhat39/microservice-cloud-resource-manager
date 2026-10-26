@@ -1,0 +1,103 @@
+**********************
+PowerShell transcript start
+Start time: 20261025131721
+Username: D5D0Ds\d5d0ds
+RunAs User: D5D0Ds\d5d0ds
+Configuration Name:
+Machine: D5D0Ds (Unix 27.0.1)
+Host Application: /private/tmp/crm-20261025/tools/pwsh/pwsh.dll -NoProfile -File scripts/integration.ps1 -SkipBuild -DbHost 127.0.0.1 -DbPort 55435
+Process ID: 31044
+PSVersion: 7.6.8
+PSEdition: Core
+GitCommitId: 7.6.8
+OS: macOS 27.0.1
+Platform: Unix
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1, 6.0, 7.0
+PSRemotingProtocolVersion: 2.4
+SerializationVersion: 1.1.0.1
+WSManStackVersion: 3.0
+**********************
+Integration test 2026-10-25T07:47:21.5942560Z; tenant=integration-29911b6af1fa4bb4a7a26fc456515a67
+Seven service processes, five PostgreSQL databases, no HTTP stubs.
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PASS: 20 concurrent quota requests, five accepted at capacity, 15 rejected; releases apply once
+PASS: provisioning, ACTIVE notification, usage, available zero cost, replay and payload mismatch
+PASS: manual termination, provider shutdown, stable stopped cost, quota release, TERMINATED notification
+PASS: real Billing 503, saga compensation, provider cleanup, quota refund and FAILED notification
+PASS: scheduled expiry through real Resource, provider shutdown, meter stop, quota release and notification
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+>> TerminatingError(Invoke-WebRequest): "Connection refused"
+PASS: durable teardown survives Resource restart during Billing outage
+PASS: partial and total peer outage; worker remains running
+RESULT: integration test passed
+**********************
+PowerShell transcript end
+End time: 20261025131812
+**********************

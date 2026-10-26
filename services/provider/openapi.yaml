@@ -5,7 +5,7 @@ info:
     and failures.
   version: v1
 servers:
-- url: http://localhost:8085
+- url: http://127.0.0.1:8085
   description: Generated server url
 paths:
   /api/v1/provider/instances:
@@ -31,6 +31,18 @@ paths:
               $ref: "#/components/schemas/ProvisionInstanceRequest"
         required: true
       responses:
+        "201":
+          description: Created or replayed instance
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/InstanceResponse"
+        "409":
+          description: Provisioning request was cancelled
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/InstanceResponse"
         "400":
           description: Invalid input
           content:
@@ -43,12 +55,6 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
-        "201":
-          description: Created or replayed instance
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/InstanceResponse"
   /api/v1/provider/instances/{id}:
     delete:
       tags:
@@ -94,6 +100,35 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/provider/instances/requests/{clientToken}:
+    delete:
+      tags:
+      - provider-controller
+      summary: "Cancel provisioning by client token, including requests still in flight"
+      operationId: cancel
+      parameters:
+      - name: clientToken
+        in: path
+        required: true
+        schema:
+          type: string
+          maxLength: 256
+          minLength: 0
+      responses:
+        "400":
+          description: Invalid input
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Simulated failure or interrupted operation
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "204":
+          description: Request cancelled
 components:
   schemas:
     ProvisionInstanceRequest:
@@ -133,19 +168,26 @@ components:
           type: string
           format: uri
         title:
-          type: string
+          type:
+          - string
+          - "null"
         status:
           type: integer
           format: int32
         detail:
-          type: string
+          type:
+          - string
+          - "null"
         instance:
-          type: string
+          type:
+          - string
+          - "null"
           format: uri
         properties:
-          type: object
-          additionalProperties:
-            type: object
+          type:
+          - object
+          - "null"
+          additionalProperties: {}
     InstanceResponse:
       type: object
       properties:

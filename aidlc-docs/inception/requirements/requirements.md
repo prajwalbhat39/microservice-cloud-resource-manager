@@ -571,8 +571,7 @@ member reviewed and can explain the code they present.
 
 ## 13. Decision Log
 
-Recorded verbatim from the two question rounds. Numbers refer to
-`requirement-verification-questions.md` and `requirement-verification-questions-followup.md`.
+Confirmed decisions from requirements clarification.
 
 | # | Decision | Choice |
 |---|----------|--------|

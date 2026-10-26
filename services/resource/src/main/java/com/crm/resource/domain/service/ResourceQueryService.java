@@ -21,16 +21,7 @@ import java.util.UUID;
 /**
  * FR-17, FR-18, FR-24 support (R3, R4, R6 — read-only, no state change).
  *
- * <p>========================= BUILDING BLOCKS ALREADY CREATED =========================
- * <ul>
- *   <li>{@code resourceRepository} — findById; findByTenantIdAndStatus(tenantId, status);
- *       findByTenantId(tenantId); findExpired(Instant now)
- *   <li>new NotFoundException(ErrorCode.RESOURCE_NOT_FOUND, msg) -&gt; 404
- *   <li>Map a {@code Resource} entity to a {@code ResourceResponse} record (same field names;
- *       this is a straightforward getter-by-getter translation, same pattern as
- *       Quota's TenantService.get)
- * </ul>
- * ===================================================================================
+ *
  */
 @Service
 public class ResourceQueryService {
@@ -52,12 +43,7 @@ public class ResourceQueryService {
                         "Resource " + resourceId + " not found"));
     }
 
-    /**
-     * R4: list a tenant's resources, optionally filtered by status. {@code tenantId} is
-     * required (a cross-tenant listing has no caller here and would be an accidental
-     * data-exposure endpoint, assumption A8); {@code status} optional and must be a
-     * ResourceStatus name, else 400 VALIDATION_FAILED naming the allowed values.
-     */
+    /** Require tenant scope to prevent accidental cross-tenant listings. */
     @Transactional(readOnly = true)
     public ResourceListResponse list(String tenantId, String status) {
         if (tenantId == null || tenantId.isBlank()) {

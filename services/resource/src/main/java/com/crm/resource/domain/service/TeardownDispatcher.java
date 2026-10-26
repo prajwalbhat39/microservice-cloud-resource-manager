@@ -4,32 +4,34 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-/**
- * Mirrors SagaDispatcher: dispatches a {@link TerminationTask} only after the enclosing
- * transaction commits (functional-design.md 9.6). The teardown itself ({@link TerminationTeardown#run})
- * is {@code @Async("sagaExecutor")}: provider.terminate (skipped if no instance), billing.stopMeter,
- * quota.release, notification.send("TERMINATED"). Every step is idempotent; a failed step is
- * logged and NOT retried-as-compensation (termination is not a rollback — "nothing to roll back").
- */
 @Component
 public class TeardownDispatcher {
 
-    private final TerminationTeardown teardown;
+    private final ResourceWorkRunner runner;
+    private final ResourceWork work;
 
-    public TeardownDispatcher(TerminationTeardown teardown) {
-        this.teardown = teardown;
+    public TeardownDispatcher(ResourceWorkRunner runner, ResourceWork work) {
+        this.runner = runner; this.work = work;
     }
 
     public void afterCommit(TerminationTask task) {
+        work.enqueue(task.resourceId(), "TERMINATE", task);
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            teardown.run(task);
+            dispatch(task.resourceId());
             return;
         }
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                teardown.run(task);
+                dispatch(task.resourceId());
             }
         });
     }
+    private void dispatch(java.util.UUID id) {
+        try { runner.dispatch(id); }
+        catch (org.springframework.core.task.TaskRejectedException busy) {
+            // The scheduled recovery owns work rejected by the in-memory executor.
+        }
+    }
+
 }

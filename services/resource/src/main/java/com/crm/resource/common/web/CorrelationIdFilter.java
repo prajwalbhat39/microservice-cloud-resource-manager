@@ -14,15 +14,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.UUID;
 
-/**
- * NFR-13: reads X-Correlation-Id or generates one, MDC for the life of the request, ALWAYS
- * cleared in finally (Tomcat reuses threads). This is the ORCHESTRATOR's copy; unlike Quota's,
- * this ID must ALSO survive the async saga boundary — see AsyncConfig's TaskDecorator and the
- * correlationId field carried on ProvisioningTask/TerminationTask (nfr-design.md 3.3).
- *
- * <p>Length cap (64) and blank check: the ID lands in every log line, so an unbounded
- * caller-supplied header would be a log-injection and log-bloat vector.
- */
+/** Bound caller IDs and clear MDC before returning a reused server thread. */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class CorrelationIdFilter extends OncePerRequestFilter {

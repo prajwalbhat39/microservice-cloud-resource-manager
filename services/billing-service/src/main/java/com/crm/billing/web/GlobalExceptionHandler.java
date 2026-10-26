@@ -1,78 +1,102 @@
 package com.crm.billing.web;
 
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.ConstraintViolationException;
 import java.net.URI;
 import java.time.Instant;
-import java.util.stream.Collectors;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ProblemDetail;
-import org.springframework.validation.FieldError;
+import java.util.Locale;
+import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
+import org.springframework.dao.DataAccessException;
+import org.springframework.transaction.TransactionException;
+import org.springframework.http.*;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.ServletWebRequest;
+import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 
 @RestControllerAdvice
-public class GlobalExceptionHandler {
+public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @Override
+    protected ResponseEntity<Object> handleExceptionInternal(Exception failure, Object body,
+            HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        String code = switch (status.value()) {
+            case 404 -> "ENDPOINT_NOT_FOUND";
+            case 400 -> failure instanceof HttpMessageNotReadableException
+                    ? "MALFORMED_REQUEST" : "VALIDATION_FAILED";
+            case 405 -> "METHOD_NOT_ALLOWED";
+            case 406 -> "NOT_ACCEPTABLE";
+            case 415 -> "UNSUPPORTED_MEDIA_TYPE";
+            case 500 -> "INTERNAL_ERROR";
+            default -> "HTTP_" + status.value();
+        };
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(status, "Request could not be processed");
+        if (failure instanceof MethodArgumentNotValidException validation) {
+            detail.setProperty("errors", validation.getBindingResult().getFieldErrors().stream()
+                    .map(e -> Map.of("field", e.getField(), "message", e.getDefaultMessage())).toList());
+        }
+        if (failure instanceof HandlerMethodValidationException validation) {
+            detail.setProperty("errors", validation.getParameterValidationResults().stream()
+                    .flatMap(result -> result.getResolvableErrors().stream().map(error -> Map.of(
+                            "field", java.util.Objects.requireNonNullElse(
+                                    result.getMethodParameter().getParameterName(), "request"),
+                            "message", java.util.Objects.requireNonNullElse(error.getDefaultMessage(), "Invalid value"))))
+                    .toList());
+        }
+        if (failure instanceof org.springframework.web.bind.MissingServletRequestParameterException missing) {
+            detail.setProperty("errors", java.util.List.of(Map.of("field", missing.getParameterName(), "message", "Required parameter")));
+        }
+        enrich(detail, code, request);
+        return ResponseEntity.status(status).headers(headers)
+                .contentType(MediaType.APPLICATION_PROBLEM_JSON).body(detail);
+    }
 
     @ExceptionHandler(NotFoundException.class)
-    public ProblemDetail handleNotFound(NotFoundException ex, HttpServletRequest request) {
-        return problem(HttpStatus.NOT_FOUND, ex.getMessage(), "NOT_FOUND", request, "not-found");
+    ResponseEntity<Object> missing(NotFoundException failure, WebRequest request) {
+        return problem(HttpStatus.NOT_FOUND, "METER_NOT_FOUND", request);
     }
 
     @ExceptionHandler(BadRequestException.class)
-    public ProblemDetail handleBadRequest(BadRequestException ex, HttpServletRequest request) {
-        return problem(HttpStatus.BAD_REQUEST, ex.getMessage(), "BAD_REQUEST", request, "bad-request");
+    ResponseEntity<Object> invalid(BadRequestException failure, WebRequest request) {
+        var response = problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", request);
+        ((ProblemDetail) response.getBody()).setDetail(failure.getMessage());
+        return response;
     }
 
     @ExceptionHandler(ServiceUnavailableException.class)
-    public ProblemDetail handleServiceUnavailable(ServiceUnavailableException ex, HttpServletRequest request) {
-        return problem(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), "DOWNSTREAM_UNAVAILABLE", request,
-            "service-unavailable");
+    ResponseEntity<Object> simulated(ServiceUnavailableException failure, WebRequest request) {
+        return problem(HttpStatus.SERVICE_UNAVAILABLE, "DOWNSTREAM_UNAVAILABLE", request);
     }
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ProblemDetail handleValidation(MethodArgumentNotValidException ex, HttpServletRequest request) {
-        String detail = ex.getBindingResult().getFieldErrors().stream()
-            .map(this::formatFieldError)
-            .collect(Collectors.joining(", "));
-        return problem(HttpStatus.BAD_REQUEST, detail, "VALIDATION_FAILED", request, "validation-failed");
-    }
-
-    @ExceptionHandler(ConstraintViolationException.class)
-    public ProblemDetail handleConstraintViolation(ConstraintViolationException ex, HttpServletRequest request) {
-        return problem(HttpStatus.BAD_REQUEST, ex.getMessage(), "VALIDATION_FAILED", request, "validation-failed");
-    }
-
-    @ExceptionHandler(MissingServletRequestParameterException.class)
-    public ProblemDetail handleMissingRequestParam(MissingServletRequestParameterException ex,
-                                                   HttpServletRequest request) {
-        String detail = ex.getParameterName() + " is required";
-        return problem(HttpStatus.BAD_REQUEST, detail, "VALIDATION_FAILED", request, "validation-failed");
+    @ExceptionHandler({DataAccessException.class, TransactionException.class})
+    ResponseEntity<Object> databaseUnavailable(RuntimeException failure, WebRequest request) {
+        log.error("billing.persistence.failed cause={}", failure.getClass().getSimpleName());
+        return problem(HttpStatus.SERVICE_UNAVAILABLE, "DOWNSTREAM_UNAVAILABLE", request);
     }
 
     @ExceptionHandler(Exception.class)
-    public ProblemDetail handleUnhandled(Exception ex, HttpServletRequest request) {
-        return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error", "INTERNAL_ERROR", request,
-            "internal-error");
+    ResponseEntity<Object> unexpected(Exception failure, WebRequest request) {
+        log.error("api.unexpected cause={}", failure.getClass().getSimpleName());
+        return problem(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", request);
     }
 
-    private ProblemDetail problem(HttpStatus status,
-                                  String detail,
-                                  String code,
-                                  HttpServletRequest request,
-                                  String typeSuffix) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
-        problem.setTitle(status.getReasonPhrase());
-        problem.setType(URI.create("https://crm.example/errors/" + typeSuffix));
-        problem.setProperty("code", code);
-        problem.setProperty("correlationId", request.getAttribute(CorrelationIdFilter.CORRELATION_ID_KEY));
-        problem.setProperty("timestamp", Instant.now().toString());
-        return problem;
+    private ResponseEntity<Object> problem(HttpStatus status, String code, WebRequest request) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(status, status.getReasonPhrase());
+        enrich(detail, code, request);
+        return ResponseEntity.status(status).contentType(MediaType.APPLICATION_PROBLEM_JSON).body(detail);
     }
 
-    private String formatFieldError(FieldError error) {
-        return error.getField() + " " + error.getDefaultMessage();
+    private void enrich(ProblemDetail detail, String code, WebRequest request) {
+        detail.setType(URI.create("https://crm.example/errors/" + code.toLowerCase(Locale.ROOT).replace('_', '-')));
+        detail.setInstance(URI.create(((ServletWebRequest) request).getRequest().getRequestURI()));
+        detail.setProperty("code", code);
+        detail.setProperty("correlationId", MDC.get("correlationId"));
+        detail.setProperty("timestamp", Instant.now());
     }
 }

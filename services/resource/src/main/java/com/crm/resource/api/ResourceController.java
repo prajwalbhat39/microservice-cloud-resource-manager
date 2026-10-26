@@ -1,7 +1,6 @@
 package com.crm.resource.api;
 
-import com.crm.resource.api.dto.ExpiredResourceResponse;
-import com.crm.resource.api.dto.ProvisionAcceptedResponse;
+import com.crm.resource.api.dto.ExpiredResourceListResponse;
 import com.crm.resource.api.dto.ProvisionResourceRequest;
 import com.crm.resource.api.dto.ResourceListResponse;
 import com.crm.resource.api.dto.ResourceResponse;
@@ -31,7 +30,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
-import java.util.List;
 import java.util.UUID;
 
 /**
@@ -67,7 +65,7 @@ public class ResourceController {
     })
     @PostMapping
     public ResponseEntity<?> provision(
-            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            @RequestHeader(value = "Idempotency-Key", required = false) @jakarta.validation.constraints.Size(max = 200) String idempotencyKey,
             @RequestHeader(value = "X-Simulate-Failure", required = false) String simulateFailure,
             @Valid @RequestBody ProvisionResourceRequest request) {
 
@@ -146,7 +144,8 @@ public class ResourceController {
     @Operation(summary = "Internal: ACTIVE resources past expires_at, for the Expiry Worker (FR-24 support)")
     @ApiResponse(responseCode = "200", description = "OK")
     @GetMapping("/expired")
-    public List<ExpiredResourceResponse> expired() {
-        return resourceQueryService.expired();
+    public ExpiredResourceListResponse expired() {
+        var items = resourceQueryService.expired();
+        return new ExpiredResourceListResponse(items, items.size());
     }
 }

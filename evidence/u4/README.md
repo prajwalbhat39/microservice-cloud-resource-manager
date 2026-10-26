@@ -1,38 +1,27 @@
-# Test results
+# Supporting-service evidence
 
-22 tests passed with no failures or skips. Run date: 2026-10-18 UTC.
+The [current full-project verification](../integration/README.md) includes Notification,
+Usage Aggregator and Expiry Worker with all real peers.
 
-| Check | Result | Output |
-|---|---|---|
-| Notification service | 4 unit tests passed | [tests.txt](tests.txt) |
-| Notification HTTP and PostgreSQL | 6 integration tests passed | [tests.txt](tests.txt) |
-| Usage composition and failures | 6 tests passed | [tests.txt](tests.txt) |
-| Expiry requests and failures | 6 tests passed | [tests.txt](tests.txt) |
-| Packaged services and scheduler | Passed | [e2e-output.txt](e2e-output.txt) |
-| Database outage and recovery | Passed: 503/DOWN, recovery, no inserted event, separate database access denied | [db-outage.txt](db-outage.txt) |
+The isolated packaged-service test was rerun on 2026-10-25. It uses PostgreSQL for Notification
+and WireMock for Quota, Resource and Billing. It checks event history, usage composition,
+partial and total peer outages, scheduled termination and outbound correlation IDs.
+See [output](e2e-output.txt) and [peer requests](peer-requests.json).
 
-The process test uses PostgreSQL for Notification and WireMock for Quota, Resource and Billing.
-Lifecycle events are posted directly to Notification. Full-system provisioning and cleanup still
-need testing when U1–U3 implementations are available.
+Current test counts and the five-service database outage check are in the integration results.
 
 ## Run
 
-Follow the [database setup instructions](../../services/notification/README.md), then run:
+Follow the [database setup instructions](../../services/notification-service/README.md), then run:
 
 ```powershell
 pwsh scripts/u4/verify.ps1 -Postgres
 pwsh scripts/u4/e2e.ps1 -SkipBuild
 ```
 
-The recorded run used PostgreSQL on 127.0.0.1:55434 with separate notification_u4_test and
-notification_u4_e2e databases. Test connection settings use U4_TEST_DB_URL, U4_TEST_DB_USER and
-U4_TEST_DB_PASSWORD; process-test settings use DbHost, DbPort, DbName and DbUser.
-The outage check stopped and restarted that temporary cluster, with Notification on port 18184.
+Test connections use `U4_TEST_DB_URL`, `U4_TEST_DB_USER` and `U4_TEST_DB_PASSWORD`.
+The process script accepts `DbHost`, `DbPort`, `DbName` and `DbUser`, plus service port overrides.
+The recorded process run used PostgreSQL on 127.0.0.1:55435 and ports 18184, 18186, 18187 and 18190.
 
-## Logs and API specifications
-
-- [Notification](notification.log), [Usage](usage.log), [Worker](worker.log)
-- [Peer HTTP requests](peer-requests.json)
-- [Database outage service log](db-outage-service.log)
-- OpenAPI: [Notification](../../services/notification/openapi.yaml),
-  [Usage](../../services/usage-aggregator/openapi.yaml), [Worker](../../services/expiry-worker/openapi.yaml)
+OpenAPI: [Notification](../../services/notification-service/openapi.yaml),
+[Usage](../../services/usage-aggregator/openapi.yaml), [Worker](../../services/expiry-worker/openapi.yaml).

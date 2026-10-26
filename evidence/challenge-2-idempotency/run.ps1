@@ -12,20 +12,21 @@
 # this key already, so read their stored answer and replay it verbatim. Nothing is
 # read before writing, so two simultaneous callers cannot both conclude "I'm first".
 #
-# Requires: Resource service on :8082, Quota on :8081, peer stub on :8090,
-#           PostgreSQL on :5432 with resource_db and quota_db.
-# Repeatable: every run uses its own tenant and its own keys (TR-8).
+# Requires Quota, Resource and real peers from scripts/demo/start-all.ps1.
 # =============================================================================
-#Requires -Version 7
+#Requires -Version 7.4
 
 param(
     [string]$ResourceUrl = 'http://localhost:8082',
     [string]$QuotaUrl    = 'http://localhost:8081',
+    [string]$DbHost = 'localhost',
+    [int]$DbPort = 5432,
     [string]$OutDir      = $PSScriptRoot
 )
 
 $ErrorActionPreference = 'Stop'
-$env:PGPASSWORD = 'changeme'
+$PSNativeCommandUseErrorActionPreference = $true
+$env:PGPASSWORD = if ($env:DB_PASSWORD) { $env:DB_PASSWORD } else { 'changeme' }
 
 $CONCURRENT_DUPLICATES = 10
 
@@ -33,17 +34,17 @@ $runId    = (Get-Date).ToUniversalTime().ToString('yyyyMMdd-HHmmss')
 $tenantId = "tnt-br2-$runId"
 $keySeq   = "key-sequential-$runId"
 $keyConc  = "key-concurrent-$runId"
-$tmp      = Join-Path $env:TEMP "br2-$runId"
+$tmp      = Join-Path ([System.IO.Path]::GetTempPath()) "br2-$runId"
 New-Item -ItemType Directory -Path $tmp -Force | Out-Null
 
 function Show($cmd) { Write-Host ""; Write-Host "`$ $cmd" }
 function Res-Sql([string]$sql, [string]$outFile) {
-    if ($outFile) { & psql -U resource_user -h localhost -p 5432 -d resource_db -c $sql | Out-File -FilePath $outFile -Encoding utf8 -Append }
-    else          { & psql -U resource_user -h localhost -p 5432 -d resource_db -c $sql }
+    if ($outFile) { & psql -v ON_ERROR_STOP=1 -U resource_user -h $DbHost -p $DbPort -d resource_db -c $sql | Out-File -FilePath $outFile -Encoding utf8 -Append }
+    else          { & psql -v ON_ERROR_STOP=1 -U resource_user -h $DbHost -p $DbPort -d resource_db -c $sql }
 }
 function Quota-Sql([string]$sql, [string]$outFile) {
-    if ($outFile) { & psql -U quota_user -h localhost -p 5432 -d quota_db -c $sql | Out-File -FilePath $outFile -Encoding utf8 -Append }
-    else          { & psql -U quota_user -h localhost -p 5432 -d quota_db -c $sql }
+    if ($outFile) { & psql -v ON_ERROR_STOP=1 -U quota_user -h $DbHost -p $DbPort -d quota_db -c $sql | Out-File -FilePath $outFile -Encoding utf8 -Append }
+    else          { & psql -v ON_ERROR_STOP=1 -U quota_user -h $DbHost -p $DbPort -d quota_db -c $sql }
 }
 function Write-Json($obj, $path) { ($obj | ConvertTo-Json -Compress) | Set-Content -Path $path -Encoding ascii -NoNewline }
 
@@ -58,7 +59,7 @@ Machine / OS     : $env:COMPUTERNAME / $([System.Environment]::OSVersion.Version
 PowerShell       : $($PSVersionTable.PSVersion)
 Resource service : $ResourceUrl
 Quota service    : $QuotaUrl
-Databases        : postgresql://localhost:5432/{resource_db, quota_db}
+Databases        : postgresql://${DbHost}:${DbPort}/{resource_db, quota_db}
 Test tenant      : $tenantId   (tier STANDARD => 20 CPU / 64 GB / 10 instances)
 Sequential key   : $keySeq
 Concurrent key   : $keyConc
@@ -70,7 +71,7 @@ Write-Host ""
 Write-Host "--- STEP 0: create the tenant quota will be reserved against -----------------"
 $tenantBody = Join-Path $tmp 'tenant.json'
 Write-Json @{ tenantId = $tenantId; name = "BR2 run $runId"; tier = 'STANDARD' } $tenantBody
-& curl.exe -s -o NUL -w "create tenant -> HTTP %{http_code}`n" -X POST "$QuotaUrl/api/v1/tenants" -H "Content-Type: application/json" --data "@$tenantBody"
+& curl -sS -o $(if ($IsWindows) { 'NUL' } else { '/dev/null' }) -w "create tenant -> HTTP %{http_code}`n" -X POST "$QuotaUrl/api/v1/tenants" -H "Content-Type: application/json" --data "@$tenantBody"
 
 $before = Join-Path $OutDir 'db-before.txt'
 "CHALLENGE 2 - DB STATE BEFORE  ($((Get-Date).ToUniversalTime().ToString('yyyy-MM-dd HH:mm:ss')) UTC)`ntenant: $tenantId`n" | Set-Content $before -Encoding utf8
@@ -90,14 +91,14 @@ Write-Json @{ tenantId = $tenantId; type = 'VM'; cpu = 4; ramGb = 8; durationSec
 
 Write-Host ""
 Write-Host "--- STEP 1: FIRST provision with key '$keySeq' ------"
-Show "curl.exe -s -D - -X POST $ResourceUrl/api/v1/resources -H 'Idempotency-Key: $keySeq' --data '@provision.json'"
-$firstRaw = & curl.exe -s -D "$tmp\first.headers" -o "$tmp\first.body" -w "%{http_code}" `
+Show "curl -s -D - -X POST $ResourceUrl/api/v1/resources -H 'Idempotency-Key: $keySeq' --data '@provision.json'"
+$firstRaw = & curl -sS -D "$tmp/first.headers" -o "$tmp/first.body" -w "%{http_code}" `
                 -X POST "$ResourceUrl/api/v1/resources" -H "Content-Type: application/json" `
                 -H "Idempotency-Key: $keySeq" --data "@$provBody"
 Write-Host "response headers:"
-Get-Content "$tmp\first.headers"
+Get-Content "$tmp/first.headers"
 Write-Host "response body:"
-$firstBody = Get-Content "$tmp\first.body" -Raw
+$firstBody = Get-Content "$tmp/first.body" -Raw
 Write-Host $firstBody
 $first = $firstBody | ConvertFrom-Json
 Write-Host "HTTP $firstRaw"
@@ -109,18 +110,18 @@ Write-Host ""
 Write-Host "--- STEP 2: REPEAT the IDENTICAL request with the SAME key (BR2) -------------"
 Write-Host "Expected: HTTP 202, header 'Idempotency-Replayed: true', and the SAME"
 Write-Host "reservationId/resourceId - byte-for-byte the first answer, not a new one."
-Show "curl.exe -s -D - -X POST $ResourceUrl/api/v1/resources -H 'Idempotency-Key: $keySeq' --data '@provision.json'"
-$replayRaw = & curl.exe -s -D "$tmp\replay.headers" -o "$tmp\replay.body" -w "%{http_code}" `
+Show "curl -s -D - -X POST $ResourceUrl/api/v1/resources -H 'Idempotency-Key: $keySeq' --data '@provision.json'"
+$replayRaw = & curl -sS -D "$tmp/replay.headers" -o "$tmp/replay.body" -w "%{http_code}" `
                  -X POST "$ResourceUrl/api/v1/resources" -H "Content-Type: application/json" `
                  -H "Idempotency-Key: $keySeq" --data "@$provBody"
 Write-Host "response headers:"
-Get-Content "$tmp\replay.headers"
+Get-Content "$tmp/replay.headers"
 Write-Host "response body:"
-$replayBody = Get-Content "$tmp\replay.body" -Raw
+$replayBody = Get-Content "$tmp/replay.body" -Raw
 Write-Host $replayBody
 Write-Host "HTTP $replayRaw"
 
-$replayedHeader = (Select-String -Path "$tmp\replay.headers" -Pattern 'Idempotency-Replayed' -SimpleMatch).Line
+$replayedHeader = (Select-String -Path "$tmp/replay.headers" -Pattern 'Idempotency-Replayed' -SimpleMatch).Line
 $bodiesIdentical = ($firstBody.Trim() -ceq $replayBody.Trim())
 Write-Host ""
 Write-Host "CHECK  replay header present : $(if ($replayedHeader) { "YES -> $($replayedHeader.Trim())" } else { 'NO' })"
@@ -133,14 +134,14 @@ Write-Host "Expected: HTTP 422 IDEMPOTENCY_PAYLOAD_MISMATCH as application/probl
 Write-Host "A key is a receipt for ONE specific request, not a blank cheque."
 $mismatchBody = Join-Path $tmp 'provision-changed.json'
 Write-Json @{ tenantId = $tenantId; type = 'VM'; cpu = 8; ramGb = 8; durationSeconds = 7200 } $mismatchBody
-Show "curl.exe -s -D - -X POST $ResourceUrl/api/v1/resources -H 'Idempotency-Key: $keySeq' --data '@provision-changed.json'  # cpu 4 -> 8"
-$mmRaw = & curl.exe -s -D "$tmp\mm.headers" -o "$tmp\mm.body" -w "%{http_code}" `
+Show "curl -s -D - -X POST $ResourceUrl/api/v1/resources -H 'Idempotency-Key: $keySeq' --data '@provision-changed.json'  # cpu 4 -> 8"
+$mmRaw = & curl -sS -D "$tmp/mm.headers" -o "$tmp/mm.body" -w "%{http_code}" `
              -X POST "$ResourceUrl/api/v1/resources" -H "Content-Type: application/json" `
              -H "Idempotency-Key: $keySeq" --data "@$mismatchBody"
 Write-Host "response headers:"
-Get-Content "$tmp\mm.headers"
+Get-Content "$tmp/mm.headers"
 Write-Host "response body:"
-Get-Content "$tmp\mm.body" -Raw
+Get-Content "$tmp/mm.body" -Raw
 Write-Host "HTTP $mmRaw"
 
 Write-Host ""
@@ -167,7 +168,7 @@ $concResults = 1..$CONCURRENT_DUPLICATES | ForEach-Object -ThrottleLimit $CONCUR
     while ((Get-Date) -lt $using:startAt) { Start-Sleep -Milliseconds 2 }
 
     $sent = (Get-Date).ToString('HH:mm:ss.fff')
-    $code = & curl.exe -s -D $hdr -o $bdy -w "%{http_code}" `
+    $code = & curl -sS -D $hdr -o $bdy -w "%{http_code}" `
                  -X POST "$($using:ResourceUrl)/api/v1/resources" -H "Content-Type: application/json" `
                  -H "Idempotency-Key: $($using:keyConc)" --data "@$($using:concBody)"
 
@@ -215,9 +216,9 @@ Quota-Sql "select count(*) as ledger_rows from quota_reservations where tenant_i
 Get-Content $after
 
 # ------------------------------------------------------------- 6. verdict -----
-$resCount = [int](& psql -U resource_user -h localhost -p 5432 -d resource_db -t -A -c "select count(*) from resources where tenant_id = '$tenantId';")
-$idemCount = [int](& psql -U resource_user -h localhost -p 5432 -d resource_db -t -A -c "select count(*) from idempotency_records where idempotency_key in ('$keySeq','$keyConc');")
-$cpuUsed  = [int](& psql -U quota_user -h localhost -p 5432 -d quota_db -t -A -c "select cpu_used from tenant_quota where tenant_id = '$tenantId';")
+$resCount = [int](& psql -v ON_ERROR_STOP=1 -U resource_user -h $DbHost -p $DbPort -d resource_db -t -A -c "select count(*) from resources where tenant_id = '$tenantId';")
+$idemCount = [int](& psql -v ON_ERROR_STOP=1 -U resource_user -h $DbHost -p $DbPort -d resource_db -t -A -c "select count(*) from idempotency_records where idempotency_key in ('$keySeq','$keyConc');")
+$cpuUsed  = [int](& psql -v ON_ERROR_STOP=1 -U quota_user -h $DbHost -p $DbPort -d quota_db -t -A -c "select cpu_used from tenant_quota where tenant_id = '$tenantId';")
 
 $pass = $replayedHeader -and $bodiesIdentical -and ($mmRaw -eq '422') -and
         ($conc202 -eq $CONCURRENT_DUPLICATES) -and ($distinctRes.Count -eq 1) -and

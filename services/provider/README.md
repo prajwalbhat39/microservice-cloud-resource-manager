@@ -147,3 +147,10 @@ integration-test service:
 ```
 
 The export normalizes the random test server URL to the default port 8085.
+
+## Cancelling an uncertain request
+
+`DELETE /api/v1/provider/instances/requests/{clientToken}` returns 204. It records cancellation
+and terminates any instance already created for the token. A delayed new provision with that
+token returns 409; a persisted instance replay keeps its existing identity and state. This lets
+the orchestrator compensate even when it did not receive the original instance ID.

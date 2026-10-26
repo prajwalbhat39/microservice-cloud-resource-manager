@@ -23,15 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * The verbatim-replay rule (nfr-design.md 2.5): a replayed response keeps its ORIGINAL
- * correlationId and timestamp and its {@code application/problem+json} content type. It is never
- * re-stamped, because AC-2.1 asks for a response <i>identical</i> to the first and the Challenge 2
- * script asserts that by comparing bodies.
- *
- * <p>Exercised at the controller, which is where the stored bytes are written back. The service is
- * stubbed because the decision itself is covered by {@link IdempotencyServiceTest}.
- */
+/** Replayed response bytes retain the original metadata and content type. */
 class IdempotencyReplayTest {
 
     private static final String KEY = "0f8c3a7e-provision-001";

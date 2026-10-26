@@ -1,0 +1,18 @@
+version: 2
+updates:
+  - package-ecosystem: maven
+    directories:
+      - /services/quota
+      - /services/resource
+      - /services/billing-service
+      - /services/provider
+      - /services/notification-service
+      - /services/usage-aggregator
+      - /services/expiry-worker
+    schedule:
+      interval: monthly
+    ignore:
+      - dependency-name: org.springframework.boot:spring-boot-starter-parent
+        update-types: [version-update:semver-major, version-update:semver-minor]
+      - dependency-name: org.springdoc:springdoc-openapi-starter-webmvc-api
+        update-types: [version-update:semver-major]

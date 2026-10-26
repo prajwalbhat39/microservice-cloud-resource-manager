@@ -10,6 +10,7 @@ spring:
     username: ${DB_USER:notification_user}
     password: ${DB_PASSWORD:changeme}
     hikari:
+      minimum-idle: 0
       connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:2000}
       maximum-pool-size: ${DB_POOL_MAX:5}
   jpa:

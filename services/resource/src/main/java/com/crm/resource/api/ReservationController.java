@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
 
-/** R2 (functional-design.md 4.2). */
+/** Read the provider instance ID from the linked resource row. */
 @RestController
 @RequestMapping("/api/v1/reservations")
 public class ReservationController {

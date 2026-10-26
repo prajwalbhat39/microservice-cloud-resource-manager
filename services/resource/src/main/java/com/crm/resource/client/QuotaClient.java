@@ -20,26 +20,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-/**
- * The REAL peer in U1 (Quota is in the same unit, running on :8081 by default). One class per
- * peer (not a generic PeerHttpClient) because each peer has its own timeouts and its own retry
- * predicate (nfr-design.md 8.2) — Quota retries connect failures only, since BR1's atomic UPDATE
- * is final the instant it returns and a read timeout is ambiguous (the reservation may have
- * been taken).
- *
- * <p>Error translation (functional-design.md 9.3, nfr-design.md 2.4):
- * <ul>
- *   <li>404 TENANT_NOT_FOUND -&gt; {@link NotFoundException}, so the orchestrator propagates
- *       Quota's answer rather than inventing one (A12)
- *   <li>422 QUOTA_EXCEEDED / TIER_FORBIDS_RESOURCE_TYPE -&gt;
- *       {@link BusinessRuleViolationException} carrying the SAME code, the same detail AND the
- *       peer's extension members (notably {@code exhausted[]}, which AC-1.3 is read from)
- *   <li>409 QUOTA_RESERVATION_ALREADY_RELEASED -&gt; {@link StateConflictException}
- *   <li>timeout / connection failure / 503 after retries -&gt;
- *       {@link DownstreamUnavailableException} with DOWNSTREAM_UNAVAILABLE and no extensions
- *       (there is nothing authoritative to carry)
- * </ul>
- */
+/** Preserve Quota business errors and extensions; retry connect failures, not ambiguous read timeouts. */
 @Component
 public class QuotaClient {
 

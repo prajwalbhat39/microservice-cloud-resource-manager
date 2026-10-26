@@ -28,10 +28,8 @@ candidates. Concurrent workers and manual termination are safe **only because th
 owns the atomic transition and exactly-once quota-release guard**. A 202 acknowledges the
 request; cleanup may still be pending.
 
-**Upstream limitation:** the current U1 design marks TERMINATED before background teardown and
-makes repeats a no-op. If teardown then fails, the worker cannot repair it: the resource vanishes
-from the expired list. The orchestrator needs to handle this recovery. See the integration notes
-for the remaining full-system checks.
+Resource retains durable teardown work after accepting termination and retries failed cleanup
+independently of the expired-candidate list. The worker does not duplicate that state.
 
 ## Configuration and tests
 

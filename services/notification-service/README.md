@@ -9,7 +9,7 @@ Maven Wrapper. From the repository root, create the development database once:
 
 ```sh
 psql -U YOUR_POSTGRES_ADMIN -d postgres -f scripts/u4/setup-notification.sql
-cd services/notification
+cd services/notification-service
 ./mvnw spring-boot:run
 ```
 
@@ -63,7 +63,7 @@ For PostgreSQL integration tests, create a **dedicated test database** once from
 
 ```sh
 psql -U YOUR_POSTGRES_ADMIN -d postgres -f scripts/u4/setup-test-db.sql
-cd services/notification
+cd services/notification-service
 ./mvnw -Ppostgres verify
 ```
 

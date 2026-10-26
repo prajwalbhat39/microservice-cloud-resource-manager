@@ -1,0 +1,85 @@
+Full reactor verification: raw summary lines, 2026-10-25
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.039 s -- in com.crm.quota.domain.TierPolicyTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.812 s -- in com.crm.quota.Br7ReleaseExactlyOnceIT
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.441 s -- in com.crm.quota.Br1ConcurrencyIT
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.689 s -- in com.crm.resource.api.ResourceControllerTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.021 s -- in com.crm.resource.domain.ClientTokenTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s -- in com.crm.resource.domain.RequestFingerprintTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.008 s -- in com.crm.resource.domain.ResourceLifecycleTest
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.542 s -- in com.crm.resource.domain.service.ProvisioningSagaCompensationTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.061 s -- in com.crm.resource.domain.service.IdempotencyServiceTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.068 s -- in com.crm.resource.domain.service.IdempotencyReplayTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.010 s -- in com.crm.resource.client.BillingClientTest
+[INFO] Tests run: 37, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.571 s -- in com.crm.resource.RecoveryIT
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.558 s -- in com.crm.resource.IdempotencyPayloadMismatchIT
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.236 s -- in com.crm.resource.TerminationIdempotencyIT
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.125 s -- in com.crm.resource.IdempotencyConcurrencyIT
+[INFO] Tests run: 18, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.179 s -- in com.crm.billing.api.BillingControllerTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.166 s -- in com.crm.billing.service.StoppedCostTest
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.116 s -- in com.crm.billing.service.BillingServiceImplTest
+[INFO] Tests run: 13, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.135 s -- in com.crm.provider.config.ProviderPropertiesTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.398 s -- in com.crm.provider.domain.service.ProviderServiceTest
+[INFO] Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.086 s -- in com.crm.provider.domain.service.ProviderSimulatorTest
+[INFO] Tests run: 19, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 17, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.928 s -- in com.crm.provider.ProviderApiIT
+[INFO] Tests run: 17, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.272 s -- in com.crm.notification.domain.NotificationServiceTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.943 s -- in com.crm.notification.NotificationHttpIT
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.153 s -- in com.crm.usage.UsageHttpTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.132 s -- in com.crm.expiry.ExpirySweepTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Reactor Summary:
+[INFO]
+[INFO] quota-service 1.0.0-SNAPSHOT ....................... SUCCESS [  5.853 s]
+[INFO] resource-service 1.0.0-SNAPSHOT .................... SUCCESS [  7.823 s]
+[INFO] billing-service 0.0.1-SNAPSHOT ..................... SUCCESS [  3.361 s]
+[INFO] provider-service 1.0.0-SNAPSHOT .................... SUCCESS [  4.780 s]
+[INFO] notification 1.0.0 ................................. SUCCESS [  4.257 s]
+[INFO] usage-aggregator 1.0.0 ............................. SUCCESS [  2.974 s]
+[INFO] expiry-worker 1.0.0 ................................ SUCCESS [  2.909 s]
+[INFO] Cloud Resource Manager (aggregator) 1.0.0-SNAPSHOT . SUCCESS [  0.010 s]
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  32.149 s
+[INFO] Finished at: 2026-10-25T12:55:44+05:30
+[INFO] ------------------------------------------------------------------------
+
+Final Quota and Resource verification: raw summary lines, 2026-10-25
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.037 s -- in com.crm.quota.domain.TierPolicyTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.727 s -- in com.crm.quota.Br7ReleaseExactlyOnceIT
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.455 s -- in com.crm.quota.Br1ConcurrencyIT
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.727 s -- in com.crm.resource.api.ResourceControllerTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.023 s -- in com.crm.resource.domain.ClientTokenTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.007 s -- in com.crm.resource.domain.RequestFingerprintTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.009 s -- in com.crm.resource.domain.ResourceLifecycleTest
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.630 s -- in com.crm.resource.domain.service.ProvisioningSagaCompensationTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.056 s -- in com.crm.resource.domain.service.IdempotencyServiceTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.066 s -- in com.crm.resource.domain.service.IdempotencyReplayTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.011 s -- in com.crm.resource.client.BillingClientTest
+[INFO] Tests run: 37, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.905 s -- in com.crm.resource.RecoveryIT
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.590 s -- in com.crm.resource.IdempotencyPayloadMismatchIT
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.236 s -- in com.crm.resource.TerminationIdempotencyIT
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.134 s -- in com.crm.resource.IdempotencyConcurrencyIT
+[INFO] Tests run: 18, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Reactor Summary for quota-service 1.0.0-SNAPSHOT:
+[INFO]
+[INFO] quota-service ...................................... SUCCESS [  5.461 s]
+[INFO] resource-service ................................... SUCCESS [  8.382 s]
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  14.003 s
+[INFO] Finished at: 2026-10-25T13:15:44+05:30
+[INFO] ------------------------------------------------------------------------

@@ -1,11 +1,5 @@
 package com.crm.resource.domain;
 
-/**
- * The events that drive transitions in {@link ResourceLifecycle}'s table (functional-design.md
- * 6.1). Naming the event (rather than just setting a field) keeps the one place that writes
- * provider_instance_id inside the state machine, and gives a symmetric place for compensation
- * to clear it.
- */
 public enum ResourceEvent {
     /** REQUESTED -> PROVISIONING. Quota already reserved; row inserted. */
     PROVISION_STARTED,

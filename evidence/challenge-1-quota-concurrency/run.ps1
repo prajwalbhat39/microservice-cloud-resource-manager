@@ -13,15 +13,18 @@
 # Requires: Quota service on :8081, PostgreSQL on :5432 with quota_db.
 # Repeatable: every run creates its own uniquely-named tenants (TR-8).
 # =============================================================================
-#Requires -Version 7
+#Requires -Version 7.4
 
 param(
     [string]$QuotaUrl = 'http://localhost:8081',
+    [string]$DbHost = 'localhost',
+    [int]$DbPort = 5432,
     [string]$OutDir   = $PSScriptRoot
 )
 
 $ErrorActionPreference = 'Stop'
-$env:PGPASSWORD = 'changeme'
+$PSNativeCommandUseErrorActionPreference = $true
+$env:PGPASSWORD = if ($env:DB_PASSWORD) { $env:DB_PASSWORD } else { 'changeme' }
 
 $CPU_PER_REQUEST      = 4
 $RAM_PER_REQUEST      = 8
@@ -31,14 +34,14 @@ $EXPECTED_SUCCESSES   = 5     # 20 CPU limit / 4 CPU each
 $runId     = (Get-Date).ToUniversalTime().ToString('yyyyMMdd-HHmmss')
 $tenantId  = "tnt-br1-$runId"
 $freeTenant = "tnt-br1-free-$runId"
-$tmp       = Join-Path $env:TEMP "br1-$runId"
+$tmp       = Join-Path ([System.IO.Path]::GetTempPath()) "br1-$runId"
 New-Item -ItemType Directory -Path $tmp -Force | Out-Null
 
 function Show($cmd) { Write-Host ""; Write-Host "`$ $cmd" }
 
 function Quota-Sql([string]$sql, [string]$outFile) {
-    if ($outFile) { & psql -U quota_user -h localhost -p 5432 -d quota_db -c $sql | Out-File -FilePath $outFile -Encoding utf8 -Append }
-    else          { & psql -U quota_user -h localhost -p 5432 -d quota_db -c $sql }
+    if ($outFile) { & psql -v ON_ERROR_STOP=1 -U quota_user -h $DbHost -p $DbPort -d quota_db -c $sql | Out-File -FilePath $outFile -Encoding utf8 -Append }
+    else          { & psql -v ON_ERROR_STOP=1 -U quota_user -h $DbHost -p $DbPort -d quota_db -c $sql }
 }
 
 function Write-Json($obj, $path) {
@@ -55,7 +58,7 @@ Run (local)      : $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss zzz')
 Machine / OS     : $env:COMPUTERNAME / $([System.Environment]::OSVersion.VersionString)
 PowerShell       : $($PSVersionTable.PSVersion)
 Quota service    : $QuotaUrl
-Database         : postgresql://localhost:5432/quota_db
+Database         : postgresql://${DbHost}:${DbPort}/quota_db
 Test tenant      : $tenantId   (tier STANDARD => 20 CPU / 64 GB / 10 instances)
 Scenario         : $CONCURRENT_REQUESTS simultaneous reservations of $CPU_PER_REQUEST CPU each
 Expected         : exactly $EXPECTED_SUCCESSES x HTTP 200, exactly $($CONCURRENT_REQUESTS - $EXPECTED_SUCCESSES) x HTTP 422, final cpu_used = 20
@@ -67,8 +70,8 @@ Write-Host ""
 Write-Host "--- STEP 1: create a STANDARD tenant -----------------------------------------"
 $tenantBody = Join-Path $tmp 'tenant.json'
 Write-Json @{ tenantId = $tenantId; name = "BR1 concurrency run $runId"; tier = 'STANDARD' } $tenantBody
-Show "curl.exe -s -w '\nHTTP %{http_code}' -X POST $QuotaUrl/api/v1/tenants -H 'Content-Type: application/json' --data '@tenant.json'"
-& curl.exe -s -w "`nHTTP %{http_code}`n" -X POST "$QuotaUrl/api/v1/tenants" -H "Content-Type: application/json" --data "@$tenantBody"
+Show "curl -s -w '\nHTTP %{http_code}' -X POST $QuotaUrl/api/v1/tenants -H 'Content-Type: application/json' --data '@tenant.json'"
+& curl -sS -w "`nHTTP %{http_code}`n" -X POST "$QuotaUrl/api/v1/tenants" -H "Content-Type: application/json" --data "@$tenantBody"
 
 # ------------------------------------------------------ 2. DB state before ----
 Write-Host ""
@@ -104,7 +107,7 @@ $results = 1..$CONCURRENT_REQUESTS | ForEach-Object -ThrottleLimit $CONCURRENT_R
     while ((Get-Date) -lt $using:startAt) { Start-Sleep -Milliseconds 2 }
 
     $sent = (Get-Date).ToString('HH:mm:ss.fff')
-    $code = & curl.exe -s -o $respFile -w "%{http_code}" -X POST "$($using:QuotaUrl)/api/v1/quota/reservations" `
+    $code = & curl -sS -o $respFile -w "%{http_code}" -X POST "$($using:QuotaUrl)/api/v1/quota/reservations" `
                  -H "Content-Type: application/json" --data "@$bodyFile"
 
     [pscustomobject]@{
@@ -150,8 +153,8 @@ Get-Content $after
 
 Write-Host ""
 Write-Host "usage as reported by the API:"
-Show "curl.exe -s $QuotaUrl/api/v1/tenants/$tenantId/quota"
-& curl.exe -s "$QuotaUrl/api/v1/tenants/$tenantId/quota"
+Show "curl -s $QuotaUrl/api/v1/tenants/$tenantId/quota"
+& curl -sS "$QuotaUrl/api/v1/tenants/$tenantId/quota"
 Write-Host ""
 
 # --------------------------------------------- 6. FAILURE CASE (ER-4/TR-10) ---
@@ -161,19 +164,19 @@ Write-Host "BR1 must reject on business grounds with 422, naming the exhausted d
 Write-Host "and must NOT fall back to a 400 or a 500."
 $freeBody = Join-Path $tmp 'tenant-free.json'
 Write-Json @{ tenantId = $freeTenant; name = "BR1 free run $runId"; tier = 'FREE' } $freeBody
-& curl.exe -s -o NUL -w "create FREE tenant -> HTTP %{http_code}`n" -X POST "$QuotaUrl/api/v1/tenants" -H "Content-Type: application/json" --data "@$freeBody"
+& curl -sS -o $(if ($IsWindows) { 'NUL' } else { '/dev/null' }) -w "create FREE tenant -> HTTP %{http_code}`n" -X POST "$QuotaUrl/api/v1/tenants" -H "Content-Type: application/json" --data "@$freeBody"
 
 $overBody = Join-Path $tmp 'reserve-over.json'
 Write-Json @{ tenantId = $freeTenant; resourceId = [guid]::NewGuid().ToString(); type = 'VM'; cpu = 4; ramGb = 8 } $overBody
-Show "curl.exe -s -w '\nHTTP %{http_code}' -X POST $QuotaUrl/api/v1/quota/reservations --data '@reserve-over.json'"
-& curl.exe -s -w "`nHTTP %{http_code}`n" -X POST "$QuotaUrl/api/v1/quota/reservations" -H "Content-Type: application/json" --data "@$overBody"
+Show "curl -s -w '\nHTTP %{http_code}' -X POST $QuotaUrl/api/v1/quota/reservations --data '@reserve-over.json'"
+& curl -sS -w "`nHTTP %{http_code}`n" -X POST "$QuotaUrl/api/v1/quota/reservations" -H "Content-Type: application/json" --data "@$overBody"
 
 Write-Host ""
 Write-Host "--- STEP 7: FAILURE CASE - BR8, a FREE tenant may not provision a CLUSTER ----"
 $clusterBody = Join-Path $tmp 'reserve-cluster.json'
 Write-Json @{ tenantId = $freeTenant; resourceId = [guid]::NewGuid().ToString(); type = 'CLUSTER'; cpu = 1; ramGb = 1 } $clusterBody
-Show "curl.exe -s -w '\nHTTP %{http_code}' -X POST $QuotaUrl/api/v1/quota/reservations --data '@reserve-cluster.json'"
-& curl.exe -s -w "`nHTTP %{http_code}`n" -X POST "$QuotaUrl/api/v1/quota/reservations" -H "Content-Type: application/json" --data "@$clusterBody"
+Show "curl -s -w '\nHTTP %{http_code}' -X POST $QuotaUrl/api/v1/quota/reservations --data '@reserve-cluster.json'"
+& curl -sS -w "`nHTTP %{http_code}`n" -X POST "$QuotaUrl/api/v1/quota/reservations" -H "Content-Type: application/json" --data "@$clusterBody"
 
 # ------------------------------------------------------------- 8. verdict -----
 $pass = ($ok -eq $EXPECTED_SUCCESSES) -and ($rejected -eq ($CONCURRENT_REQUESTS - $EXPECTED_SUCCESSES)) -and ($other -eq 0)

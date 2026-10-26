@@ -1,7 +1,6 @@
 package com.crm.quota.persistence.repository;
 
 import com.crm.quota.persistence.entity.TenantQuota;
-import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;

@@ -2,14 +2,7 @@ package com.crm.quota.common.error;
 
 import java.util.Map;
 
-/**
- * Abstract root of every anticipated API failure. One root means the advice has one primary
- * handler and the catalogue of failures is enumerable by reading this package. Every subclass
- * carries its {@link ErrorCode}, which carries the HTTP status.
- *
- * <p>{@code extensions} are RFC 9457 extension members added to the problem body (e.g.
- * {@code exhausted[]} for QUOTA_EXCEEDED, {@code currentStatus} for INVALID_STATE_TRANSITION).
- */
+/** Extensions become RFC 9457 problem members, such as {@code exhausted}. */
 public abstract class ApiException extends RuntimeException {
 
     private final ErrorCode code;

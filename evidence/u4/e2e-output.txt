@@ -1,15 +1,15 @@
 **********************
 PowerShell transcript start
-Start time: 20261019004630
+Start time: 20261025131721
 Username: D5D0Ds\d5d0ds
 RunAs User: D5D0Ds\d5d0ds
-Configuration Name: 
+Configuration Name:
 Machine: D5D0Ds (Unix 27.0.1)
-Host Application: /private/tmp/crm-u4-tools/pwsh/pwsh.dll -NoProfile -File scripts/u4/e2e.ps1 -SkipBuild -DbHost 127.0.0.1 -DbPort 55434 -DbName notification_u4_e2e -DbUser notification_e2e_user
-Process ID: 9491
-PSVersion: 7.6.7
+Host Application: /private/tmp/crm-20261025/tools/pwsh/pwsh.dll -NoProfile -File scripts/u4/e2e.ps1 -SkipBuild -DbHost 127.0.0.1 -DbPort 55435 -NotificationPort 18184 -UsagePort 18186 -WorkerPort 18187 -StubPort 18190
+Process ID: 30915
+PSVersion: 7.6.8
 PSEdition: Core
-GitCommitId: 7.6.7
+GitCommitId: 7.6.8
 OS: macOS 27.0.1
 Platform: Unix
 PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1, 6.0, 7.0
@@ -17,9 +17,9 @@ PSRemotingProtocolVersion: 2.4
 SerializationVersion: 1.1.0.1
 WSManStackVersion: 3.0
 **********************
-U4 process E2E 2026-10-18T19:16:30.7262870Z
-Scope: three actual U4 jars, PostgreSQL, and WireMock peers. This is not the full-team provisioning saga.
-COMMAND: pwsh scripts/u4/e2e.ps1 -SkipBuild:True -DbHost 127.0.0.1 -DbPort 55434 -DbName notification_u4_e2e -DbUser notification_e2e_user
+End-to-end test 2026-10-25T07:47:21.0185370Z
+Services: Notification, Usage Aggregator, Expiry Worker. Dependencies: PostgreSQL and WireMock.
+COMMAND: pwsh scripts/u4/e2e.ps1 -SkipBuild:True -DbHost 127.0.0.1 -DbPort 55435 -DbName notification_db -DbUser notification_user
 [INFO] Scanning for projects...
 [INFO]
 [INFO] ----------------------< com.crm:usage-aggregator >----------------------
@@ -31,8 +31,8 @@ COMMAND: pwsh scripts/u4/e2e.ps1 -SkipBuild:True -DbHost 127.0.0.1 -DbPort 55434
 [INFO] ------------------------------------------------------------------------
 [INFO] BUILD SUCCESS
 [INFO] ------------------------------------------------------------------------
-[INFO] Total time:  0.433 s
-[INFO] Finished at: 2026-10-19T00:46:31+05:30
+[INFO] Total time:  0.838 s
+[INFO] Finished at: 2026-10-25T13:17:22+05:30
 [INFO] ------------------------------------------------------------------------
 PS>TerminatingError(Invoke-WebRequest): "Connection refused"
 PS>TerminatingError(Invoke-WebRequest): "Connection refused"
@@ -45,13 +45,21 @@ PS>TerminatingError(Invoke-WebRequest): "Connection refused"
 PS>TerminatingError(Invoke-WebRequest): "Connection refused"
 PS>TerminatingError(Invoke-WebRequest): "Connection refused"
 PS>TerminatingError(Invoke-WebRequest): "Connection refused"
-PASS: lifecycle acceptance, persisted notification, composition and available zero cost
-PASS: billing outage degrades only the cost section
-PASS: total upstream outage still returns explicit availability
-PASS: actual scheduled expiry invokes the orchestrator contract; all three lifecycle events persisted
-PASS: exported runtime OpenAPI specifications and captured correlated peer HTTP requests
-RESULT: U4 process end-to-end checks passed
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+PS>TerminatingError(Invoke-WebRequest): "Connection refused"
+PASS: notification recorded; usage contains quota, resources and zero cost
+PASS: billing outage omits cost and preserves quota and resources
+PASS: all availability flags are false during an outage
+PASS: scheduled termination requested; notification history contains all three events
+PASS: OpenAPI exported; peer requests include correlation IDs
+RESULT: end-to-end test passed
 **********************
 PowerShell transcript end
-End time: 20261019004636
+End time: 20261025131729
 **********************

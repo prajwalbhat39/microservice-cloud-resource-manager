@@ -1,28 +1,11 @@
-CHALLENGE 3C - downstream calls seen from the PEER services' own logs
-Captured: 2026-10-24 17:41:21 +05:30  (REAL services - provider :8085, billing :8083, notification :8084)
-correlationId : 1fb6a472-f2a5-4be1-9a5a-b9354d8b528b
-providerInstance: i-mock-7b639f06-dae8-4718-9022-08195bc42075
-
-This corroborates saga-logs.txt from the OTHER side of the wire. These lines come from the
-peers' OWN windows/logs, not from the orchestrator, so they prove the calls genuinely crossed
-the network to the real services.
-
---- BILLING (:8083) - three POSTs to start the meter, the retry storm (local time) ---
-The orchestrator retried the billing meter-start 3 times; each hit the REAL billing service,
-which returned 503 (Finding 5 fix: billing now accepts the orchestrator's 'always-fail' header
-value and maps it to a simulated 503, instead of the earlier 500):
-  2026-10-24T17:38:45.091+05:30 DEBUG 20136 --- [billing-service] [nio-8083-exec-3] o.s.web.servlet.DispatcherServlet : POST "/api/v1/billing/meters", parameters={}
-  2026-10-24T17:38:45.404+05:30 DEBUG 20136 --- [billing-service] [nio-8083-exec-4] o.s.web.servlet.DispatcherServlet : POST "/api/v1/billing/meters", parameters={}
-  2026-10-24T17:38:45.710+05:30 DEBUG 20136 --- [billing-service] [nio-8083-exec-7] o.s.web.servlet.DispatcherServlet : POST "/api/v1/billing/meters", parameters={}
-
---- PROVIDER (:8085) - provision then terminate, SAME instance id (UTC) ---
-  12:08:43.745  POST "/api/v1/provider/instances", parameters={}
-  12:08:45.056  provider.provisioned instanceId=i-mock-7b639f06-dae8-4718-9022-08195bc42075
-  12:08:45.059  Completed 201 CREATED
-  12:08:45.744  DELETE "/api/v1/provider/instances/i-mock-7b639f06-dae8-4718-9022-08195bc42075", parameters={masked}
-  12:08:46.936  provider.terminated instanceId=i-mock-7b639f06-dae8-4718-9022-08195bc42075
-  12:08:46.938  Completed 200 OK
-
-The DELETE/terminate carries the SAME instance id the provision returned (i-mock-7b639f06-dae8-4718-9022-08195bc42075),
-proving compensation undid exactly what step 2 created and nothing more. There is NO billing
-meter-STOP call, because the meter never started - step 3 failed before it could.
+{"@timestamp":"2026-10-25T07:46:26.561779Z","log":{"level":"INFO","logger":"com.crm.provider.domain.service.ProviderService"},"process":{"pid":30742,"thread":{"name":"http-nio-8085-exec-4"}},"service":{"name":"provider-service","version":"1.0.0-SNAPSHOT","node":{}},"message":"provider.provisioned instanceId=i-mock-c9c466cc-9a67-480d-85e8-ba543d40fdc5","correlationId":"be6f2891-6343-4680-8be6-c4bf59ed77d2","ecs":{"version":"8.11"}}
+{"@timestamp":"2026-10-25T07:46:26.563258Z","log":{"level":"DEBUG","logger":"org.springframework.web.servlet.DispatcherServlet"},"process":{"pid":30742,"thread":{"name":"http-nio-8085-exec-4"}},"service":{"name":"provider-service","version":"1.0.0-SNAPSHOT","node":{}},"message":"Completed 201 CREATED","correlationId":"be6f2891-6343-4680-8be6-c4bf59ed77d2","ecs":{"version":"8.11"}}
+{"@timestamp":"2026-10-25T07:46:27.264874Z","log":{"level":"INFO","logger":"com.crm.provider.domain.service.ProviderService"},"process":{"pid":30742,"thread":{"name":"http-nio-8085-exec-5"}},"service":{"name":"provider-service","version":"1.0.0-SNAPSHOT","node":{}},"message":"provider.cancelled clientToken=ct-27ab4c9b-eebd-44f1-86b5-e0c693d4ac95","correlationId":"be6f2891-6343-4680-8be6-c4bf59ed77d2","ecs":{"version":"8.11"}}
+{"@timestamp":"2026-10-25T07:46:27.265011Z","log":{"level":"DEBUG","logger":"org.springframework.web.servlet.DispatcherServlet"},"process":{"pid":30742,"thread":{"name":"http-nio-8085-exec-5"}},"service":{"name":"provider-service","version":"1.0.0-SNAPSHOT","node":{}},"message":"Completed 204 NO_CONTENT","correlationId":"be6f2891-6343-4680-8be6-c4bf59ed77d2","ecs":{"version":"8.11"}}
+{"@timestamp":"2026-10-25T07:46:26.589509Z","log":{"level":"DEBUG","logger":"org.springframework.web.servlet.DispatcherServlet"},"process":{"pid":30740,"thread":{"name":"http-nio-8083-exec-4"}},"service":{"name":"billing-service","version":"0.0.1-SNAPSHOT","node":{}},"message":"Completed 503 SERVICE_UNAVAILABLE","correlationId":"be6f2891-6343-4680-8be6-c4bf59ed77d2","ecs":{"version":"8.11"}}
+{"@timestamp":"2026-10-25T07:46:26.820327Z","log":{"level":"DEBUG","logger":"org.springframework.web.servlet.DispatcherServlet"},"process":{"pid":30740,"thread":{"name":"http-nio-8083-exec-5"}},"service":{"name":"billing-service","version":"0.0.1-SNAPSHOT","node":{}},"message":"Completed 503 SERVICE_UNAVAILABLE","correlationId":"be6f2891-6343-4680-8be6-c4bf59ed77d2","ecs":{"version":"8.11"}}
+{"@timestamp":"2026-10-25T07:46:27.237747Z","log":{"level":"DEBUG","logger":"org.springframework.web.servlet.DispatcherServlet"},"process":{"pid":30740,"thread":{"name":"http-nio-8083-exec-6"}},"service":{"name":"billing-service","version":"0.0.1-SNAPSHOT","node":{}},"message":"Completed 503 SERVICE_UNAVAILABLE","correlationId":"be6f2891-6343-4680-8be6-c4bf59ed77d2","ecs":{"version":"8.11"}}
+{"@timestamp":"2026-10-25T07:46:27.256063Z","log":{"level":"DEBUG","logger":"org.springframework.web.servlet.DispatcherServlet"},"process":{"pid":30740,"thread":{"name":"http-nio-8083-exec-7"}},"service":{"name":"billing-service","version":"0.0.1-SNAPSHOT","node":{}},"message":"Completed 404 NOT_FOUND","correlationId":"be6f2891-6343-4680-8be6-c4bf59ed77d2","ecs":{"version":"8.11"}}
+{"@timestamp":"2026-10-25T07:46:27.297589Z","@version":"1","message":"Completed 202 ACCEPTED","logger_name":"org.springframework.web.servlet.DispatcherServlet","thread_name":"http-nio-8084-exec-5","level":"DEBUG","level_value":10000,"correlationId":"be6f2891-6343-4680-8be6-c4bf59ed77d2","service":"notification"}
+{"@timestamp":"2026-10-25T07:46:25.623525Z","log":{"level":"DEBUG","logger":"org.springframework.web.servlet.DispatcherServlet"},"process":{"pid":30738,"thread":{"name":"http-nio-8081-exec-6"}},"service":{"name":"quota-service","version":"1.0.0-SNAPSHOT","node":{}},"message":"Completed 200 OK","correlationId":"be6f2891-6343-4680-8be6-c4bf59ed77d2","ecs":{"version":"8.11"}}
+{"@timestamp":"2026-10-25T07:46:27.285898Z","log":{"level":"DEBUG","logger":"org.springframework.web.servlet.DispatcherServlet"},"process":{"pid":30738,"thread":{"name":"http-nio-8081-exec-7"}},"service":{"name":"quota-service","version":"1.0.0-SNAPSHOT","node":{}},"message":"Completed 200 OK","correlationId":"be6f2891-6343-4680-8be6-c4bf59ed77d2","ecs":{"version":"8.11"}}

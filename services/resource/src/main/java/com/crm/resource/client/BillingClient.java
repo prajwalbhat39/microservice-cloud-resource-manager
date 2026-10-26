@@ -13,20 +13,7 @@ import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/**
- * Stubbed against WireMock in U1 — specifically the forced-503 billing stub that drives the
- * Challenge 3C compensation evidence (infrastructure-design.md 8). Real implementation is
- * U2 (Karan)'s Billing service.
- *
- * <p>The rate goes on the wire as a JSON <b>string</b>, never a floating-point number (NFR-22):
- * {@code "ratePerCpuHour": "0.1200"}. Money through a double is how rounding errors get into a
- * bill. Scale is fixed at 4 so the value is stable regardless of how the config was written.
- *
- * <p>Meter start is idempotent on {@code resourceId} (FR-30), which is what makes the retry safe
- * (NFR-27): a retried start cannot double-charge. Retries cover timeouts, connection failures and
- * 503 only; exhausted retries surface as BILLING_UNAVAILABLE, the prefix the saga writes into
- * failure_reason and the evidence that step 2 had already completed (A11).
- */
+/** Send money as a fixed-scale decimal string. Meter retries use the same resource ID. */
 @Component
 public class BillingClient {
 

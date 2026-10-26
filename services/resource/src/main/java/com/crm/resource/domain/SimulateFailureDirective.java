@@ -6,29 +6,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Locale;
 import java.util.Set;
 
-/**
- * FR-42, FR-45, FR-46: the parsed {@code X-Simulate-Failure} header, persisted on
- * {@code reservations.simulate_failure} and replayed by the background saga onto the matching
- * downstream call — the header itself is long gone by then (the client's HTTP exchange ended
- * at the 202).
- *
- * <p>Routing table (functional-design.md 9.4):
- * <pre>
- * Stored value                                Replayed to Provider   Replayed to Billing
- * (absent)                                    nothing                nothing
- * always-fail / always-succeed / slow         that value (bare       nothing
- *                                              form targets the
- *                                              provider, FR-42)
- * provider:&lt;mode&gt;                             &lt;mode&gt;                 nothing
- * billing:&lt;mode&gt;                              nothing                &lt;mode&gt;
- * anything else                               nothing                nothing (DEBUG log only)
- * </pre>
- *
- * <p>{@link #normalise(String)} lower-cases and trims; an unrecognised value is dropped (stored
- * as null, logged at DEBUG, never an error) so a stray header can never fail a genuine request.
- *
- * @param raw the normalised stored value, or null if absent/unrecognised
- */
+/** Persist the targeted failure directive so the async saga can forward it to the chosen peer. */
 public record SimulateFailureDirective(String raw) {
 
     private static final Logger log = LoggerFactory.getLogger(SimulateFailureDirective.class);

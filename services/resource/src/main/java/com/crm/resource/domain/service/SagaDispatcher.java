@@ -4,36 +4,35 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-/**
- * Dispatches a {@link ProvisioningTask} to the saga executor ONLY AFTER the enclosing
- * transaction commits (functional-design.md 9.3, step (e)) — dispatching inside the transaction
- * is a classic bug: the pooled thread can start before the {@code resources} row is visible to
- * it (different connection) and "cannot find" a resource being inserted on another connection.
- *
- * <p>Registers an {@code afterCommit()} synchronization that calls {@code ProvisioningSaga.run(task)}.
- * {@code run} is {@code @Async("sagaExecutor")}, so the call returns immediately on the web thread.
- * If the transaction rolls back, the callback never fires and the saga never starts.
- */
 @Component
 public class SagaDispatcher {
 
-    private final ProvisioningSaga saga;
+    private final ResourceWorkRunner runner;
+    private final ResourceWork work;
 
-    public SagaDispatcher(ProvisioningSaga saga) {
-        this.saga = saga;
+    public SagaDispatcher(ResourceWorkRunner runner, ResourceWork work) {
+        this.runner = runner; this.work = work;
     }
 
     public void afterCommit(ProvisioningTask task) {
+        work.enqueue(task.resourceId(), "PROVISION", task);
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             // Not inside a transaction (e.g. a unit test): nothing to wait for, run now.
-            saga.run(task);
+            dispatch(task.resourceId());
             return;
         }
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                saga.run(task);
+                dispatch(task.resourceId());
             }
         });
     }
+    private void dispatch(java.util.UUID id) {
+        try { runner.dispatch(id); }
+        catch (org.springframework.core.task.TaskRejectedException busy) {
+            // The scheduled recovery owns work rejected by the in-memory executor.
+        }
+    }
+
 }

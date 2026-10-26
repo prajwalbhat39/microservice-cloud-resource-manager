@@ -5,7 +5,7 @@
 **Unit**: U1 — Core Challenge Services
 **Owner**: Prajwal (core owner)
 **Services in scope**: Quota (`:8081`, `quota_db`), Resource / Orchestrator (`:8082`, `resource_db`)
-**Depends on**: `inception/requirements/requirements.md` (approved), `inception/design/application-design.md` (approved, contracts frozen), `inception/units.md` (approved), `inception/workflow-plan.md` (approved)
+**Depends on**: `inception/requirements/requirements.md` (approved), `inception/design/application-design.md` (approved, contracts frozen), `inception/units.md` (approved)
 **Consumed by**: `nfr-requirements.md`, `nfr-design.md`, `infrastructure-design.md`, then Code Generation for U1
 
 This document is the implementable specification of U1's behaviour: endpoints, DTOs, domain

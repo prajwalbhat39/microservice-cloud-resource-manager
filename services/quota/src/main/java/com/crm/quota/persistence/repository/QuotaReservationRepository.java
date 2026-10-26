@@ -14,15 +14,7 @@ public interface QuotaReservationRepository extends JpaRepository<QuotaReservati
     /** Ledger lookup by the opaque resource id; served by uq_quota_reservations_resource_id (BR7). */
     Optional<QuotaReservation> findByResourceId(String resourceId);
 
-    /**
-     * BR7, the release gate (functional-design.md 8). Returns 1 for the first release and 0 for
-     * every repeat, including a concurrent one.
-     *
-     * <p>The {@code state = 'RESERVED'} predicate is evaluated by the database as part of the
-     * write, under the row lock the write itself takes, so there is no window between deciding
-     * and acting. A read-then-save in Java here is NOT equivalent: ten simultaneous callers
-     * would all read {@code RESERVED}, all conclude they were first, and all refund the quota.
-     */
+    /** The database state predicate makes concurrent refunds apply once. */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
         UPDATE quota_reservations

@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public class InstanceRepository {
@@ -28,7 +29,13 @@ public class InstanceRepository {
                 .stream().findFirst();
     }
 
+    @Transactional
     public InstanceResponse createOrGet(ProvisionInstanceRequest request) {
+        jdbc.query("SELECT pg_advisory_xact_lock(hashtext(?))", rs -> { }, request.clientToken());
+        if (Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM cancelled_requests WHERE client_token = ?)", Boolean.class, request.clientToken()))) {
+            throw new com.crm.provider.common.error.ProviderException(
+                    com.crm.provider.common.error.ErrorCode.INSTANCE_REQUEST_CANCELLED, "Provision request was cancelled");
+        }
         // ON CONFLICT waits for a competing insert; the following READ COMMITTED statement
         // sees its committed row. No caught constraint error or poisoned transaction is needed.
         jdbc.update("""
@@ -46,5 +53,12 @@ public class InstanceRepository {
                 UPDATE instances SET status = 'TERMINATED', terminated_at = now()
                 WHERE instance_id = ? AND status = 'ACTIVE'
                 """, id);
+    }
+
+    @Transactional
+    public void cancel(String token) {
+        jdbc.query("SELECT pg_advisory_xact_lock(hashtext(?))", rs -> { }, token);
+        jdbc.update("INSERT INTO cancelled_requests(client_token) VALUES (?) ON CONFLICT DO NOTHING", token);
+        jdbc.update("UPDATE instances SET status = 'TERMINATED', terminated_at = now() WHERE client_token = ? AND status = 'ACTIVE'", token);
     }
 }

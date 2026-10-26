@@ -21,14 +21,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * BR2 unit test. The guard is the database's own affected-row count, so here the repository is a
- * mock and the two outcomes are stubbed directly: 1 row inserted (we were first) or 0 rows
- * (ON CONFLICT DO NOTHING — someone beat us). That a REAL concurrent duplicate really does behave
- * this way against PostgreSQL is proven separately by {@code IdempotencyConcurrencyIT}.
- *
- * <p>Covers steps 3-6 of the decision table (functional-design.md 9.2).
- */
+/** Exercise fresh, replay, in-flight and payload-mismatch decisions from repository results. */
 class IdempotencyServiceTest {
 
     private static final String KEY = "0f8c3a7e-provision-001";

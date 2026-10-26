@@ -24,15 +24,7 @@ import java.util.concurrent.TimeUnit;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathMatching;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * BR7 (the orchestrator's gate 1), database-backed (Testcontainers). Proves
- * {@code markTerminatedIfActive} admits exactly one winner under concurrency: the status
- * predicate is evaluated by PostgreSQL as part of the write, under the row lock the write itself
- * takes, so two callers cannot both see ACTIVE and both proceed (functional-design.md 9.6).
- *
- * <p>This is not a theoretical race: a user, the expiry worker and a retry can all terminate the
- * same resource at the same moment.
- */
+/** Concurrent termination requests must produce one state transition and teardown. */
 class TerminationIdempotencyIT extends AbstractResourceIT {
 
     private static final int CONCURRENT_CALLERS = 10;

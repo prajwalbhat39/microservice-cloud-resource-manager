@@ -2,7 +2,7 @@
 
 **Stage**: INCEPTION / Units Generation
 **Status**: APPROVED (2026-10-13)
-**Depends on**: `inception/design/application-design.md` (approved), `inception/workflow-plan.md` (approved)
+**Depends on**: `inception/design/application-design.md` (approved)
 
 This document defines the units of work, assigns owners, establishes the build order, and
 resolves the two open items from earlier stages. Every unit is a deployable service or a set of

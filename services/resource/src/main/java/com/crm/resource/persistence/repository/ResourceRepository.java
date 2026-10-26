@@ -16,7 +16,7 @@ import java.util.UUID;
  */
 public interface ResourceRepository extends JpaRepository<Resource, UUID> {
 
-    /** R4: list a tenant's resources, optionally filtered by status. */
+    /** Require tenant scope to prevent accidental cross-tenant listings. */
     List<Resource> findByTenantIdAndStatus(String tenantId, String status);
 
     List<Resource> findByTenantId(String tenantId);
@@ -28,14 +28,7 @@ public interface ResourceRepository extends JpaRepository<Resource, UUID> {
         """, nativeQuery = true)
     List<Resource> findExpired(@Param("now") Instant now);
 
-    /**
-     * BR7 gate 1 (functional-design.md 9.6): one winner moves ACTIVE -> TERMINATED, however many
-     * callers race. Returns 1 for the winner, 0 for every repeat (including a concurrent one).
-     *
-     * <p>The status predicate is evaluated by the database as part of the write, under the row
-     * lock the write takes, so two simultaneous callers cannot both see ACTIVE and both win.
-     * {@code clearAutomatically} drops stale managed copies so a re-read sees TERMINATED.
-     */
+    /** The conditional UPDATE selects one termination winner; clear stale managed copies afterward. */
     @Modifying(clearAutomatically = true)
     @Query(value = """
         UPDATE resources

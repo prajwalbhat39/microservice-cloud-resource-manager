@@ -11,16 +11,7 @@ import org.springframework.web.client.RestClient;
 
 import java.time.Duration;
 
-/**
- * One RestClient.Builder per peer, each with its own connect/read timeouts (nfr-design.md 8.1)
- * and the SAME correlation-id request initializer (nfr-design.md 3.2) — so a new peer added
- * later cannot be added without the header, since the initializer lives on the shared builder
- * factory method, not per call site.
- *
- * <p>The four @Bean methods below read the peers.* properties from application.yml
- * (QUOTA_SERVICE_URL etc.) via @Value. Each bean name matches what the corresponding Client
- * constructor injects, e.g. "quotaRestClientBuilder".
- */
+/** Each peer has separate timeouts; all builders forward the correlation ID. */
 @Configuration
 public class RestClientConfig {
 

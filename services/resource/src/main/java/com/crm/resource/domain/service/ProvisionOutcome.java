@@ -5,17 +5,7 @@ import com.crm.resource.common.error.ApiException;
 
 import java.util.UUID;
 
-/**
- * What {@link ProvisioningService#provision} hands back to the controller. Exactly one shape:
- * <ul>
- *   <li><b>accepted</b> — a fresh 202; {@link #body()} is the typed body;
- *   <li><b>stored response</b> — the exact status and body text frozen on the idempotency key,
- *       either replayed ({@link #isReplayed()} true, {@code Idempotency-Replayed: true}) or the
- *       fresh business rejection that was just frozen on the key. The controller returns the
- *       stored text verbatim (verbatim-replay rule, nfr-design.md 2.5);
- *   <li><b>in-flight</b> — a 202 pointing at the same reservationId (decision-table step 6).
- * </ul>
- */
+/** A fresh acceptance or a stored response returned verbatim. */
 public final class ProvisionOutcome {
 
     private final ProvisionAcceptedResponse body;
@@ -39,12 +29,7 @@ public final class ProvisionOutcome {
         return new ProvisionOutcome(body, null, false, null, null, body.reservationId());
     }
 
-    /**
-     * Step 5/6 of the decision table: a stored or in-flight 202 is being replayed.
-     * REPLAY carries the stored status and body text unchanged; IN_FLIGHT builds a PENDING body
-     * for the same reservationId (the resourceId is not known to a duplicate that arrives before
-     * the winner commits, so it is null in that body).
-     */
+    /** Replay the stored response, or the original pending reservation while it is in flight. */
     public static ProvisionOutcome of(IdempotencyDecision decision) {
         return switch (decision.kind()) {
             case REPLAY -> new ProvisionOutcome(null, null, true,

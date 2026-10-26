@@ -1,26 +1,26 @@
 {
   "requests": [
     {
-      "id": "7b0386fe-4d75-47b9-84cc-f7aa1bf8e3ee",
+      "id": "9cd65ef3-5d6e-49c8-9847-48c763f1898d",
       "request": {
-        "url": "/api/v1/resources/9acab2eb-41fe-48c9-b94e-d51571fe95cd/termination",
-        "absoluteUrl": "http://localhost:18090/api/v1/resources/9acab2eb-41fe-48c9-b94e-d51571fe95cd/termination",
+        "url": "/api/v1/resources/1fb81ee9-3bff-4f10-9eea-95ca485df986/termination",
+        "absoluteUrl": "http://localhost:18190/api/v1/resources/1fb81ee9-3bff-4f10-9eea-95ca485df986/termination",
         "method": "POST",
         "clientIp": "127.0.0.1",
         "headers": {
-          "x-correlation-id": "d76817cf-66f2-4eb0-82ae-0fb7ed4a2e9d",
-          "user-agent": "Java-http-client/21.0.12.1"
+          "x-correlation-id": "59cc2cbd-6d38-424d-bf9b-5560683c170a",
+          "user-agent": "Java-http-client/21.0.13"
         },
         "cookies": {},
         "browserProxyRequest": false,
-        "loggedDate": 1792350995821,
+        "loggedDate": 1792914449117,
         "bodyAsBase64": "",
         "body": "",
         "protocol": "HTTP/2.0",
         "scheme": "http",
         "host": "localhost",
-        "port": 18090,
-        "loggedDateString": "2026-10-18T19:16:35.821Z",
+        "port": 18190,
+        "loggedDateString": "2026-10-25T07:47:29.117Z",
         "queryParams": {},
         "formParams": {}
       },
@@ -28,7 +28,7 @@
         "status": 202,
         "jsonBody": {
           "status": "TERMINATED",
-          "resourceId": "9acab2eb-41fe-48c9-b94e-d51571fe95cd"
+          "resourceId": "1fb81ee9-3bff-4f10-9eea-95ca485df986"
         },
         "headers": {
           "Content-Type": "application/json"
@@ -38,10 +38,10 @@
         "status": 202,
         "headers": {
           "Content-Type": "application/json",
-          "Matched-Stub-Id": "97b416de-06f4-450a-b157-fdf5005e4d04"
+          "Matched-Stub-Id": "afd4b04c-c0ce-49c3-ade7-03695ef6e38e"
         },
-        "bodyAsBase64": "eyJzdGF0dXMiOiJURVJNSU5BVEVEIiwicmVzb3VyY2VJZCI6IjlhY2FiMmViLTQxZmUtNDhjOS1iOTRlLWQ1MTU3MWZlOTVjZCJ9",
-        "body": "{\"status\":\"TERMINATED\",\"resourceId\":\"9acab2eb-41fe-48c9-b94e-d51571fe95cd\"}"
+        "bodyAsBase64": "eyJzdGF0dXMiOiJURVJNSU5BVEVEIiwicmVzb3VyY2VJZCI6IjFmYjgxZWU5LTNiZmYtNGYxMC05ZWVhLTk1Y2E0ODVkZjk4NiJ9",
+        "body": "{\"status\":\"TERMINATED\",\"resourceId\":\"1fb81ee9-3bff-4f10-9eea-95ca485df986\"}"
       },
       "wasMatched": true,
       "timing": {
@@ -53,45 +53,45 @@
       },
       "subEvents": [],
       "stubMapping": {
-        "id": "97b416de-06f4-450a-b157-fdf5005e4d04",
+        "id": "afd4b04c-c0ce-49c3-ade7-03695ef6e38e",
         "request": {
-          "urlPath": "/api/v1/resources/9acab2eb-41fe-48c9-b94e-d51571fe95cd/termination",
+          "urlPath": "/api/v1/resources/1fb81ee9-3bff-4f10-9eea-95ca485df986/termination",
           "method": "POST"
         },
         "response": {
           "status": 202,
           "jsonBody": {
             "status": "TERMINATED",
-            "resourceId": "9acab2eb-41fe-48c9-b94e-d51571fe95cd"
+            "resourceId": "1fb81ee9-3bff-4f10-9eea-95ca485df986"
           },
           "headers": {
             "Content-Type": "application/json"
           }
         },
-        "uuid": "97b416de-06f4-450a-b157-fdf5005e4d04"
+        "uuid": "afd4b04c-c0ce-49c3-ade7-03695ef6e38e"
       }
     },
     {
-      "id": "90d8c360-48a3-40e1-9f16-fd09b1f6ddc0",
+      "id": "b9674d85-43c8-4d54-acae-316d4b380be3",
       "request": {
         "url": "/api/v1/resources/expired",
-        "absoluteUrl": "http://localhost:18090/api/v1/resources/expired",
+        "absoluteUrl": "http://localhost:18190/api/v1/resources/expired",
         "method": "GET",
         "clientIp": "127.0.0.1",
         "headers": {
-          "x-correlation-id": "d76817cf-66f2-4eb0-82ae-0fb7ed4a2e9d",
-          "user-agent": "Java-http-client/21.0.12.1"
+          "x-correlation-id": "59cc2cbd-6d38-424d-bf9b-5560683c170a",
+          "user-agent": "Java-http-client/21.0.13"
         },
         "cookies": {},
         "browserProxyRequest": false,
-        "loggedDate": 1792350995817,
+        "loggedDate": 1792914449114,
         "bodyAsBase64": "",
         "body": "",
         "protocol": "HTTP/2.0",
         "scheme": "http",
         "host": "localhost",
-        "port": 18090,
-        "loggedDateString": "2026-10-18T19:16:35.817Z",
+        "port": 18190,
+        "loggedDateString": "2026-10-25T07:47:29.114Z",
         "queryParams": {},
         "formParams": {}
       },
@@ -101,9 +101,9 @@
           "count": 1,
           "items": [
             {
-              "tenantId": "u4-e2e-c61153f573834536aed139ac6f67612c",
-              "resourceId": "9acab2eb-41fe-48c9-b94e-d51571fe95cd",
-              "expiresAt": "2026-10-18T19:15:35.64922Z"
+              "tenantId": "u4-e2e-96876f85427d46828506e79e8a0cc1d6",
+              "resourceId": "1fb81ee9-3bff-4f10-9eea-95ca485df986",
+              "expiresAt": "2026-10-25T07:46:28.876019Z"
             }
           ]
         },
@@ -115,10 +115,10 @@
         "status": 200,
         "headers": {
           "Content-Type": "application/json",
-          "Matched-Stub-Id": "f5314119-102d-4b07-b78b-4c41055e0d5b"
+          "Matched-Stub-Id": "680abe93-3329-4e21-98f7-4cf12395b4cd"
         },
-        "bodyAsBase64": "eyJjb3VudCI6MSwiaXRlbXMiOlt7InRlbmFudElkIjoidTQtZTJlLWM2MTE1M2Y1NzM4MzQ1MzZhZWQxMzlhYzZmNjc2MTJjIiwicmVzb3VyY2VJZCI6IjlhY2FiMmViLTQxZmUtNDhjOS1iOTRlLWQ1MTU3MWZlOTVjZCIsImV4cGlyZXNBdCI6IjIwMjYtMTAtMThUMTk6MTU6MzUuNjQ5MjIwMFoifV19",
-        "body": "{\"count\":1,\"items\":[{\"tenantId\":\"u4-e2e-c61153f573834536aed139ac6f67612c\",\"resourceId\":\"9acab2eb-41fe-48c9-b94e-d51571fe95cd\",\"expiresAt\":\"2026-10-18T19:15:35.6492200Z\"}]}"
+        "bodyAsBase64": "eyJjb3VudCI6MSwiaXRlbXMiOlt7InRlbmFudElkIjoidTQtZTJlLTk2ODc2Zjg1NDI3ZDQ2ODI4NTA2ZTc5ZThhMGNjMWQ2IiwicmVzb3VyY2VJZCI6IjFmYjgxZWU5LTNiZmYtNGYxMC05ZWVhLTk1Y2E0ODVkZjk4NiIsImV4cGlyZXNBdCI6IjIwMjYtMTAtMjVUMDc6NDY6MjguODc2MDE5MFoifV19",
+        "body": "{\"count\":1,\"items\":[{\"tenantId\":\"u4-e2e-96876f85427d46828506e79e8a0cc1d6\",\"resourceId\":\"1fb81ee9-3bff-4f10-9eea-95ca485df986\",\"expiresAt\":\"2026-10-25T07:46:28.8760190Z\"}]}"
       },
       "wasMatched": true,
       "timing": {
@@ -130,7 +130,7 @@
       },
       "subEvents": [],
       "stubMapping": {
-        "id": "f5314119-102d-4b07-b78b-4c41055e0d5b",
+        "id": "680abe93-3329-4e21-98f7-4cf12395b4cd",
         "request": {
           "urlPath": "/api/v1/resources/expired",
           "method": "GET"
@@ -141,9 +141,9 @@
             "count": 1,
             "items": [
               {
-                "tenantId": "u4-e2e-c61153f573834536aed139ac6f67612c",
-                "resourceId": "9acab2eb-41fe-48c9-b94e-d51571fe95cd",
-                "expiresAt": "2026-10-18T19:15:35.64922Z"
+                "tenantId": "u4-e2e-96876f85427d46828506e79e8a0cc1d6",
+                "resourceId": "1fb81ee9-3bff-4f10-9eea-95ca485df986",
+                "expiresAt": "2026-10-25T07:46:28.876019Z"
               }
             ]
           },
@@ -151,30 +151,30 @@
             "Content-Type": "application/json"
           }
         },
-        "uuid": "f5314119-102d-4b07-b78b-4c41055e0d5b"
+        "uuid": "680abe93-3329-4e21-98f7-4cf12395b4cd"
       }
     },
     {
-      "id": "1042416a-2648-49fc-b325-4d232be6a24a",
+      "id": "dabe0fb6-39df-4297-802c-af3194004692",
       "request": {
-        "url": "/api/v1/billing/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/cost?period=2026-10",
-        "absoluteUrl": "http://localhost:18090/api/v1/billing/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/cost?period=2026-10",
+        "url": "/api/v1/billing/tenants/u4-e2e-96876f85427d46828506e79e8a0cc1d6/cost?period=2026-10",
+        "absoluteUrl": "http://localhost:18190/api/v1/billing/tenants/u4-e2e-96876f85427d46828506e79e8a0cc1d6/cost?period=2026-10",
         "method": "GET",
         "clientIp": "127.0.0.1",
         "headers": {
-          "x-correlation-id": "18325d90-21e6-4366-b7b1-33de8c1c0824",
-          "user-agent": "Java-http-client/21.0.12.1"
+          "x-correlation-id": "1c35be38-bf2e-4562-a09f-94ecbe7ecc8f",
+          "user-agent": "Java-http-client/21.0.13"
         },
         "cookies": {},
         "browserProxyRequest": false,
-        "loggedDate": 1792350995647,
+        "loggedDate": 1792914448874,
         "bodyAsBase64": "",
         "body": "",
         "protocol": "HTTP/2.0",
         "scheme": "http",
         "host": "localhost",
-        "port": 18090,
-        "loggedDateString": "2026-10-18T19:16:35.647Z",
+        "port": 18190,
+        "loggedDateString": "2026-10-25T07:47:28.874Z",
         "queryParams": {
           "period": {
             "key": "period",
@@ -196,7 +196,7 @@
         "status": 503,
         "headers": {
           "Content-Type": "application/json",
-          "Matched-Stub-Id": "2c2099a5-16ea-44b4-92df-1954c34c4107"
+          "Matched-Stub-Id": "0c28d9f5-8a90-4f36-9df3-5037e8539fe4"
         },
         "bodyAsBase64": "e30=",
         "body": "{}"
@@ -211,9 +211,9 @@
       },
       "subEvents": [],
       "stubMapping": {
-        "id": "2c2099a5-16ea-44b4-92df-1954c34c4107",
+        "id": "0c28d9f5-8a90-4f36-9df3-5037e8539fe4",
         "request": {
-          "urlPath": "/api/v1/billing/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/cost",
+          "urlPath": "/api/v1/billing/tenants/u4-e2e-96876f85427d46828506e79e8a0cc1d6/cost",
           "method": "GET"
         },
         "response": {
@@ -223,35 +223,35 @@
             "Content-Type": "application/json"
           }
         },
-        "uuid": "2c2099a5-16ea-44b4-92df-1954c34c4107"
+        "uuid": "0c28d9f5-8a90-4f36-9df3-5037e8539fe4"
       }
     },
     {
-      "id": "d7e57f7f-273b-4893-bf0d-bb96148d4397",
+      "id": "a0d30903-e755-4d93-850e-bb951acadcb2",
       "request": {
-        "url": "/api/v1/resources?tenantId=u4-e2e-c61153f573834536aed139ac6f67612c&status=ACTIVE",
-        "absoluteUrl": "http://localhost:18090/api/v1/resources?tenantId=u4-e2e-c61153f573834536aed139ac6f67612c&status=ACTIVE",
+        "url": "/api/v1/resources?tenantId=u4-e2e-96876f85427d46828506e79e8a0cc1d6&status=ACTIVE",
+        "absoluteUrl": "http://localhost:18190/api/v1/resources?tenantId=u4-e2e-96876f85427d46828506e79e8a0cc1d6&status=ACTIVE",
         "method": "GET",
         "clientIp": "127.0.0.1",
         "headers": {
-          "x-correlation-id": "18325d90-21e6-4366-b7b1-33de8c1c0824",
-          "user-agent": "Java-http-client/21.0.12.1"
+          "x-correlation-id": "1c35be38-bf2e-4562-a09f-94ecbe7ecc8f",
+          "user-agent": "Java-http-client/21.0.13"
         },
         "cookies": {},
         "browserProxyRequest": false,
-        "loggedDate": 1792350995645,
+        "loggedDate": 1792914448872,
         "bodyAsBase64": "",
         "body": "",
         "protocol": "HTTP/2.0",
         "scheme": "http",
         "host": "localhost",
-        "port": 18090,
-        "loggedDateString": "2026-10-18T19:16:35.645Z",
+        "port": 18190,
+        "loggedDateString": "2026-10-25T07:47:28.872Z",
         "queryParams": {
           "tenantId": {
             "key": "tenantId",
             "values": [
-              "u4-e2e-c61153f573834536aed139ac6f67612c"
+              "u4-e2e-96876f85427d46828506e79e8a0cc1d6"
             ]
           },
           "status": {
@@ -274,7 +274,7 @@
         "status": 503,
         "headers": {
           "Content-Type": "application/json",
-          "Matched-Stub-Id": "5f302966-5f7c-4fcd-a465-d8c44df2dca8"
+          "Matched-Stub-Id": "27193f8c-8d06-4c93-860e-272337ab222f"
         },
         "bodyAsBase64": "e30=",
         "body": "{}"
@@ -289,7 +289,7 @@
       },
       "subEvents": [],
       "stubMapping": {
-        "id": "5f302966-5f7c-4fcd-a465-d8c44df2dca8",
+        "id": "27193f8c-8d06-4c93-860e-272337ab222f",
         "request": {
           "urlPath": "/api/v1/resources",
           "method": "GET"
@@ -301,30 +301,30 @@
             "Content-Type": "application/json"
           }
         },
-        "uuid": "5f302966-5f7c-4fcd-a465-d8c44df2dca8"
+        "uuid": "27193f8c-8d06-4c93-860e-272337ab222f"
       }
     },
     {
-      "id": "c41bce45-c323-4251-a4ce-7cb8a8650a76",
+      "id": "7f86e357-926e-4f94-a1b4-d5629fd10e55",
       "request": {
-        "url": "/api/v1/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/quota",
-        "absoluteUrl": "http://localhost:18090/api/v1/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/quota",
+        "url": "/api/v1/tenants/u4-e2e-96876f85427d46828506e79e8a0cc1d6/quota",
+        "absoluteUrl": "http://localhost:18190/api/v1/tenants/u4-e2e-96876f85427d46828506e79e8a0cc1d6/quota",
         "method": "GET",
         "clientIp": "127.0.0.1",
         "headers": {
-          "x-correlation-id": "18325d90-21e6-4366-b7b1-33de8c1c0824",
-          "user-agent": "Java-http-client/21.0.12.1"
+          "x-correlation-id": "1c35be38-bf2e-4562-a09f-94ecbe7ecc8f",
+          "user-agent": "Java-http-client/21.0.13"
         },
         "cookies": {},
         "browserProxyRequest": false,
-        "loggedDate": 1792350995643,
+        "loggedDate": 1792914448870,
         "bodyAsBase64": "",
         "body": "",
         "protocol": "HTTP/2.0",
         "scheme": "http",
         "host": "localhost",
-        "port": 18090,
-        "loggedDateString": "2026-10-18T19:16:35.643Z",
+        "port": 18190,
+        "loggedDateString": "2026-10-25T07:47:28.87Z",
         "queryParams": {},
         "formParams": {}
       },
@@ -339,7 +339,7 @@
         "status": 503,
         "headers": {
           "Content-Type": "application/json",
-          "Matched-Stub-Id": "974425c8-6694-47a0-b337-0a730cd226cc"
+          "Matched-Stub-Id": "1a7e50c5-e6cc-4eee-9454-99922f0b8c32"
         },
         "bodyAsBase64": "e30=",
         "body": "{}"
@@ -354,9 +354,9 @@
       },
       "subEvents": [],
       "stubMapping": {
-        "id": "974425c8-6694-47a0-b337-0a730cd226cc",
+        "id": "1a7e50c5-e6cc-4eee-9454-99922f0b8c32",
         "request": {
-          "urlPath": "/api/v1/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/quota",
+          "urlPath": "/api/v1/tenants/u4-e2e-96876f85427d46828506e79e8a0cc1d6/quota",
           "method": "GET"
         },
         "response": {
@@ -366,30 +366,30 @@
             "Content-Type": "application/json"
           }
         },
-        "uuid": "974425c8-6694-47a0-b337-0a730cd226cc"
+        "uuid": "1a7e50c5-e6cc-4eee-9454-99922f0b8c32"
       }
     },
     {
-      "id": "32e50507-bb23-4fc1-9493-e25c6c5fb1c3",
+      "id": "a2e344ff-b176-452c-ae4d-57eff8b0d216",
       "request": {
-        "url": "/api/v1/billing/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/cost?period=2026-10",
-        "absoluteUrl": "http://localhost:18090/api/v1/billing/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/cost?period=2026-10",
+        "url": "/api/v1/billing/tenants/u4-e2e-96876f85427d46828506e79e8a0cc1d6/cost?period=2026-10",
+        "absoluteUrl": "http://localhost:18190/api/v1/billing/tenants/u4-e2e-96876f85427d46828506e79e8a0cc1d6/cost?period=2026-10",
         "method": "GET",
         "clientIp": "127.0.0.1",
         "headers": {
-          "x-correlation-id": "1eaa7ab8-4a88-4d5b-ba53-ca125bd1ba0c",
-          "user-agent": "Java-http-client/21.0.12.1"
+          "x-correlation-id": "735352e6-6b6d-4c78-8fe4-93d65bd50639",
+          "user-agent": "Java-http-client/21.0.13"
         },
         "cookies": {},
         "browserProxyRequest": false,
-        "loggedDate": 1792350995628,
+        "loggedDate": 1792914448853,
         "bodyAsBase64": "",
         "body": "",
         "protocol": "HTTP/2.0",
         "scheme": "http",
         "host": "localhost",
-        "port": 18090,
-        "loggedDateString": "2026-10-18T19:16:35.628Z",
+        "port": 18190,
+        "loggedDateString": "2026-10-25T07:47:28.853Z",
         "queryParams": {
           "period": {
             "key": "period",
@@ -411,7 +411,7 @@
         "status": 503,
         "headers": {
           "Content-Type": "application/json",
-          "Matched-Stub-Id": "2c2099a5-16ea-44b4-92df-1954c34c4107"
+          "Matched-Stub-Id": "0c28d9f5-8a90-4f36-9df3-5037e8539fe4"
         },
         "bodyAsBase64": "e30=",
         "body": "{}"
@@ -426,9 +426,9 @@
       },
       "subEvents": [],
       "stubMapping": {
-        "id": "2c2099a5-16ea-44b4-92df-1954c34c4107",
+        "id": "0c28d9f5-8a90-4f36-9df3-5037e8539fe4",
         "request": {
-          "urlPath": "/api/v1/billing/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/cost",
+          "urlPath": "/api/v1/billing/tenants/u4-e2e-96876f85427d46828506e79e8a0cc1d6/cost",
           "method": "GET"
         },
         "response": {
@@ -438,35 +438,35 @@
             "Content-Type": "application/json"
           }
         },
-        "uuid": "2c2099a5-16ea-44b4-92df-1954c34c4107"
+        "uuid": "0c28d9f5-8a90-4f36-9df3-5037e8539fe4"
       }
     },
     {
-      "id": "ca8f4155-827e-4472-8756-805bbbd078c9",
+      "id": "dce0309c-b6d5-4926-a076-c9a8df9f3d82",
       "request": {
-        "url": "/api/v1/resources?tenantId=u4-e2e-c61153f573834536aed139ac6f67612c&status=ACTIVE",
-        "absoluteUrl": "http://localhost:18090/api/v1/resources?tenantId=u4-e2e-c61153f573834536aed139ac6f67612c&status=ACTIVE",
+        "url": "/api/v1/resources?tenantId=u4-e2e-96876f85427d46828506e79e8a0cc1d6&status=ACTIVE",
+        "absoluteUrl": "http://localhost:18190/api/v1/resources?tenantId=u4-e2e-96876f85427d46828506e79e8a0cc1d6&status=ACTIVE",
         "method": "GET",
         "clientIp": "127.0.0.1",
         "headers": {
-          "x-correlation-id": "1eaa7ab8-4a88-4d5b-ba53-ca125bd1ba0c",
-          "user-agent": "Java-http-client/21.0.12.1"
+          "x-correlation-id": "735352e6-6b6d-4c78-8fe4-93d65bd50639",
+          "user-agent": "Java-http-client/21.0.13"
         },
         "cookies": {},
         "browserProxyRequest": false,
-        "loggedDate": 1792350995626,
+        "loggedDate": 1792914448851,
         "bodyAsBase64": "",
         "body": "",
         "protocol": "HTTP/2.0",
         "scheme": "http",
         "host": "localhost",
-        "port": 18090,
-        "loggedDateString": "2026-10-18T19:16:35.626Z",
+        "port": 18190,
+        "loggedDateString": "2026-10-25T07:47:28.851Z",
         "queryParams": {
           "tenantId": {
             "key": "tenantId",
             "values": [
-              "u4-e2e-c61153f573834536aed139ac6f67612c"
+              "u4-e2e-96876f85427d46828506e79e8a0cc1d6"
             ]
           },
           "status": {
@@ -485,7 +485,7 @@
           "items": [
             {
               "status": "ACTIVE",
-              "resourceId": "9acab2eb-41fe-48c9-b94e-d51571fe95cd"
+              "resourceId": "1fb81ee9-3bff-4f10-9eea-95ca485df986"
             }
           ]
         },
@@ -497,10 +497,10 @@
         "status": 200,
         "headers": {
           "Content-Type": "application/json",
-          "Matched-Stub-Id": "5f302966-5f7c-4fcd-a465-d8c44df2dca8"
+          "Matched-Stub-Id": "27193f8c-8d06-4c93-860e-272337ab222f"
         },
-        "bodyAsBase64": "eyJjb3VudCI6MSwiaXRlbXMiOlt7InN0YXR1cyI6IkFDVElWRSIsInJlc291cmNlSWQiOiI5YWNhYjJlYi00MWZlLTQ4YzktYjk0ZS1kNTE1NzFmZTk1Y2QifV19",
-        "body": "{\"count\":1,\"items\":[{\"status\":\"ACTIVE\",\"resourceId\":\"9acab2eb-41fe-48c9-b94e-d51571fe95cd\"}]}"
+        "bodyAsBase64": "eyJjb3VudCI6MSwiaXRlbXMiOlt7InN0YXR1cyI6IkFDVElWRSIsInJlc291cmNlSWQiOiIxZmI4MWVlOS0zYmZmLTRmMTAtOWVlYS05NWNhNDg1ZGY5ODYifV19",
+        "body": "{\"count\":1,\"items\":[{\"status\":\"ACTIVE\",\"resourceId\":\"1fb81ee9-3bff-4f10-9eea-95ca485df986\"}]}"
       },
       "wasMatched": true,
       "timing": {
@@ -512,7 +512,7 @@
       },
       "subEvents": [],
       "stubMapping": {
-        "id": "5f302966-5f7c-4fcd-a465-d8c44df2dca8",
+        "id": "27193f8c-8d06-4c93-860e-272337ab222f",
         "request": {
           "urlPath": "/api/v1/resources",
           "method": "GET"
@@ -524,7 +524,7 @@
             "items": [
               {
                 "status": "ACTIVE",
-                "resourceId": "9acab2eb-41fe-48c9-b94e-d51571fe95cd"
+                "resourceId": "1fb81ee9-3bff-4f10-9eea-95ca485df986"
               }
             ]
           },
@@ -532,42 +532,42 @@
             "Content-Type": "application/json"
           }
         },
-        "uuid": "5f302966-5f7c-4fcd-a465-d8c44df2dca8"
+        "uuid": "27193f8c-8d06-4c93-860e-272337ab222f"
       }
     },
     {
-      "id": "7e4bfde2-1522-45a7-942b-f31f46d812c0",
+      "id": "b4d1da19-f5c0-454c-a292-c492356644c4",
       "request": {
-        "url": "/api/v1/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/quota",
-        "absoluteUrl": "http://localhost:18090/api/v1/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/quota",
+        "url": "/api/v1/tenants/u4-e2e-96876f85427d46828506e79e8a0cc1d6/quota",
+        "absoluteUrl": "http://localhost:18190/api/v1/tenants/u4-e2e-96876f85427d46828506e79e8a0cc1d6/quota",
         "method": "GET",
         "clientIp": "127.0.0.1",
         "headers": {
-          "x-correlation-id": "1eaa7ab8-4a88-4d5b-ba53-ca125bd1ba0c",
-          "user-agent": "Java-http-client/21.0.12.1"
+          "x-correlation-id": "735352e6-6b6d-4c78-8fe4-93d65bd50639",
+          "user-agent": "Java-http-client/21.0.13"
         },
         "cookies": {},
         "browserProxyRequest": false,
-        "loggedDate": 1792350995625,
+        "loggedDate": 1792914448849,
         "bodyAsBase64": "",
         "body": "",
         "protocol": "HTTP/2.0",
         "scheme": "http",
         "host": "localhost",
-        "port": 18090,
-        "loggedDateString": "2026-10-18T19:16:35.625Z",
+        "port": 18190,
+        "loggedDateString": "2026-10-25T07:47:28.849Z",
         "queryParams": {},
         "formParams": {}
       },
       "responseDefinition": {
         "status": 200,
         "jsonBody": {
+          "tenantId": "u4-e2e-96876f85427d46828506e79e8a0cc1d6",
           "cpu": {
             "limit": 20,
             "remaining": 16,
             "used": 4
-          },
-          "tenantId": "u4-e2e-c61153f573834536aed139ac6f67612c"
+          }
         },
         "headers": {
           "Content-Type": "application/json"
@@ -577,10 +577,10 @@
         "status": 200,
         "headers": {
           "Content-Type": "application/json",
-          "Matched-Stub-Id": "974425c8-6694-47a0-b337-0a730cd226cc"
+          "Matched-Stub-Id": "1a7e50c5-e6cc-4eee-9454-99922f0b8c32"
         },
-        "bodyAsBase64": "eyJjcHUiOnsibGltaXQiOjIwLCJyZW1haW5pbmciOjE2LCJ1c2VkIjo0fSwidGVuYW50SWQiOiJ1NC1lMmUtYzYxMTUzZjU3MzgzNDUzNmFlZDEzOWFjNmY2NzYxMmMifQ==",
-        "body": "{\"cpu\":{\"limit\":20,\"remaining\":16,\"used\":4},\"tenantId\":\"u4-e2e-c61153f573834536aed139ac6f67612c\"}"
+        "bodyAsBase64": "eyJ0ZW5hbnRJZCI6InU0LWUyZS05Njg3NmY4NTQyN2Q0NjgyODUwNmU3OWU4YTBjYzFkNiIsImNwdSI6eyJsaW1pdCI6MjAsInJlbWFpbmluZyI6MTYsInVzZWQiOjR9fQ==",
+        "body": "{\"tenantId\":\"u4-e2e-96876f85427d46828506e79e8a0cc1d6\",\"cpu\":{\"limit\":20,\"remaining\":16,\"used\":4}}"
       },
       "wasMatched": true,
       "timing": {
@@ -592,53 +592,53 @@
       },
       "subEvents": [],
       "stubMapping": {
-        "id": "974425c8-6694-47a0-b337-0a730cd226cc",
+        "id": "1a7e50c5-e6cc-4eee-9454-99922f0b8c32",
         "request": {
-          "urlPath": "/api/v1/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/quota",
+          "urlPath": "/api/v1/tenants/u4-e2e-96876f85427d46828506e79e8a0cc1d6/quota",
           "method": "GET"
         },
         "response": {
           "status": 200,
           "jsonBody": {
+            "tenantId": "u4-e2e-96876f85427d46828506e79e8a0cc1d6",
             "cpu": {
               "limit": 20,
               "remaining": 16,
               "used": 4
-            },
-            "tenantId": "u4-e2e-c61153f573834536aed139ac6f67612c"
+            }
           },
           "headers": {
             "Content-Type": "application/json"
           }
         },
-        "uuid": "974425c8-6694-47a0-b337-0a730cd226cc"
+        "uuid": "1a7e50c5-e6cc-4eee-9454-99922f0b8c32"
       }
     },
     {
-      "id": "64f89e7d-fd0f-49cf-922b-a522ff0ed412",
+      "id": "1024d562-512f-4385-b79f-2c5e5418f89a",
       "request": {
-        "url": "/api/v1/billing/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/cost?period=2026-10",
-        "absoluteUrl": "http://localhost:18090/api/v1/billing/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/cost?period=2026-10",
+        "url": "/api/v1/billing/tenants/u4-e2e-96876f85427d46828506e79e8a0cc1d6/cost?period=2026-10",
+        "absoluteUrl": "http://localhost:18190/api/v1/billing/tenants/u4-e2e-96876f85427d46828506e79e8a0cc1d6/cost?period=2026-10",
         "method": "GET",
         "clientIp": "127.0.0.1",
         "headers": {
           "Connection": "Upgrade, HTTP2-Settings",
-          "Host": "localhost:18090",
+          "Host": "localhost:18190",
           "HTTP2-Settings": "AAEAAEAAAAIAAAAAAAMAAAAAAAQBAAAAAAUAAEAAAAYABgAA",
           "Upgrade": "h2c",
-          "User-Agent": "Java-http-client/21.0.12.1",
-          "X-Correlation-Id": "48cf2bd8-4a38-4b21-b85a-3704a228f08c"
+          "User-Agent": "Java-http-client/21.0.13",
+          "X-Correlation-Id": "3db3e1d2-28f8-4e56-8c0d-1896b8ee592e"
         },
         "cookies": {},
         "browserProxyRequest": false,
-        "loggedDate": 1792350995613,
+        "loggedDate": 1792914448833,
         "bodyAsBase64": "",
         "body": "",
         "protocol": "HTTP/1.1",
         "scheme": "http",
         "host": "localhost",
-        "port": 18090,
-        "loggedDateString": "2026-10-18T19:16:35.613Z",
+        "port": 18190,
+        "loggedDateString": "2026-10-25T07:47:28.833Z",
         "queryParams": {
           "period": {
             "key": "period",
@@ -663,7 +663,7 @@
         "status": 200,
         "headers": {
           "Content-Type": "application/json",
-          "Matched-Stub-Id": "2c2099a5-16ea-44b4-92df-1954c34c4107"
+          "Matched-Stub-Id": "0c28d9f5-8a90-4f36-9df3-5037e8539fe4"
         },
         "bodyAsBase64": "eyJhbW91bnQiOiIwLjAwMDAiLCJjdXJyZW5jeSI6IlVTRCJ9",
         "body": "{\"amount\":\"0.0000\",\"currency\":\"USD\"}"
@@ -678,9 +678,9 @@
       },
       "subEvents": [],
       "stubMapping": {
-        "id": "2c2099a5-16ea-44b4-92df-1954c34c4107",
+        "id": "0c28d9f5-8a90-4f36-9df3-5037e8539fe4",
         "request": {
-          "urlPath": "/api/v1/billing/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/cost",
+          "urlPath": "/api/v1/billing/tenants/u4-e2e-96876f85427d46828506e79e8a0cc1d6/cost",
           "method": "GET"
         },
         "response": {
@@ -693,39 +693,39 @@
             "Content-Type": "application/json"
           }
         },
-        "uuid": "2c2099a5-16ea-44b4-92df-1954c34c4107"
+        "uuid": "0c28d9f5-8a90-4f36-9df3-5037e8539fe4"
       }
     },
     {
-      "id": "d4bd442d-544f-4d5b-8d27-5ff0c623aa64",
+      "id": "e69c6e4e-a2c9-454c-a495-14949e1d8726",
       "request": {
-        "url": "/api/v1/resources?tenantId=u4-e2e-c61153f573834536aed139ac6f67612c&status=ACTIVE",
-        "absoluteUrl": "http://localhost:18090/api/v1/resources?tenantId=u4-e2e-c61153f573834536aed139ac6f67612c&status=ACTIVE",
+        "url": "/api/v1/resources?tenantId=u4-e2e-96876f85427d46828506e79e8a0cc1d6&status=ACTIVE",
+        "absoluteUrl": "http://localhost:18190/api/v1/resources?tenantId=u4-e2e-96876f85427d46828506e79e8a0cc1d6&status=ACTIVE",
         "method": "GET",
         "clientIp": "127.0.0.1",
         "headers": {
           "Connection": "Upgrade, HTTP2-Settings",
-          "Host": "localhost:18090",
+          "Host": "localhost:18190",
           "HTTP2-Settings": "AAEAAEAAAAIAAAAAAAMAAAAAAAQBAAAAAAUAAEAAAAYABgAA",
           "Upgrade": "h2c",
-          "User-Agent": "Java-http-client/21.0.12.1",
-          "X-Correlation-Id": "48cf2bd8-4a38-4b21-b85a-3704a228f08c"
+          "User-Agent": "Java-http-client/21.0.13",
+          "X-Correlation-Id": "3db3e1d2-28f8-4e56-8c0d-1896b8ee592e"
         },
         "cookies": {},
         "browserProxyRequest": false,
-        "loggedDate": 1792350995610,
+        "loggedDate": 1792914448829,
         "bodyAsBase64": "",
         "body": "",
         "protocol": "HTTP/1.1",
         "scheme": "http",
         "host": "localhost",
-        "port": 18090,
-        "loggedDateString": "2026-10-18T19:16:35.61Z",
+        "port": 18190,
+        "loggedDateString": "2026-10-25T07:47:28.829Z",
         "queryParams": {
           "tenantId": {
             "key": "tenantId",
             "values": [
-              "u4-e2e-c61153f573834536aed139ac6f67612c"
+              "u4-e2e-96876f85427d46828506e79e8a0cc1d6"
             ]
           },
           "status": {
@@ -744,7 +744,7 @@
           "items": [
             {
               "status": "ACTIVE",
-              "resourceId": "9acab2eb-41fe-48c9-b94e-d51571fe95cd"
+              "resourceId": "1fb81ee9-3bff-4f10-9eea-95ca485df986"
             }
           ]
         },
@@ -756,10 +756,10 @@
         "status": 200,
         "headers": {
           "Content-Type": "application/json",
-          "Matched-Stub-Id": "5f302966-5f7c-4fcd-a465-d8c44df2dca8"
+          "Matched-Stub-Id": "27193f8c-8d06-4c93-860e-272337ab222f"
         },
-        "bodyAsBase64": "eyJjb3VudCI6MSwiaXRlbXMiOlt7InN0YXR1cyI6IkFDVElWRSIsInJlc291cmNlSWQiOiI5YWNhYjJlYi00MWZlLTQ4YzktYjk0ZS1kNTE1NzFmZTk1Y2QifV19",
-        "body": "{\"count\":1,\"items\":[{\"status\":\"ACTIVE\",\"resourceId\":\"9acab2eb-41fe-48c9-b94e-d51571fe95cd\"}]}"
+        "bodyAsBase64": "eyJjb3VudCI6MSwiaXRlbXMiOlt7InN0YXR1cyI6IkFDVElWRSIsInJlc291cmNlSWQiOiIxZmI4MWVlOS0zYmZmLTRmMTAtOWVlYS05NWNhNDg1ZGY5ODYifV19",
+        "body": "{\"count\":1,\"items\":[{\"status\":\"ACTIVE\",\"resourceId\":\"1fb81ee9-3bff-4f10-9eea-95ca485df986\"}]}"
       },
       "wasMatched": true,
       "timing": {
@@ -771,7 +771,7 @@
       },
       "subEvents": [],
       "stubMapping": {
-        "id": "5f302966-5f7c-4fcd-a465-d8c44df2dca8",
+        "id": "27193f8c-8d06-4c93-860e-272337ab222f",
         "request": {
           "urlPath": "/api/v1/resources",
           "method": "GET"
@@ -783,7 +783,7 @@
             "items": [
               {
                 "status": "ACTIVE",
-                "resourceId": "9acab2eb-41fe-48c9-b94e-d51571fe95cd"
+                "resourceId": "1fb81ee9-3bff-4f10-9eea-95ca485df986"
               }
             ]
           },
@@ -791,46 +791,46 @@
             "Content-Type": "application/json"
           }
         },
-        "uuid": "5f302966-5f7c-4fcd-a465-d8c44df2dca8"
+        "uuid": "27193f8c-8d06-4c93-860e-272337ab222f"
       }
     },
     {
-      "id": "1d4d9c19-a79c-440e-aebb-ce832fdab43e",
+      "id": "4391ce3f-01c3-4d8d-abd2-1ce14601dc01",
       "request": {
-        "url": "/api/v1/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/quota",
-        "absoluteUrl": "http://localhost:18090/api/v1/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/quota",
+        "url": "/api/v1/tenants/u4-e2e-96876f85427d46828506e79e8a0cc1d6/quota",
+        "absoluteUrl": "http://localhost:18190/api/v1/tenants/u4-e2e-96876f85427d46828506e79e8a0cc1d6/quota",
         "method": "GET",
         "clientIp": "127.0.0.1",
         "headers": {
           "Connection": "Upgrade, HTTP2-Settings",
-          "Host": "localhost:18090",
+          "Host": "localhost:18190",
           "HTTP2-Settings": "AAEAAEAAAAIAAAAAAAMAAAAAAAQBAAAAAAUAAEAAAAYABgAA",
           "Upgrade": "h2c",
-          "User-Agent": "Java-http-client/21.0.12.1",
-          "X-Correlation-Id": "48cf2bd8-4a38-4b21-b85a-3704a228f08c"
+          "User-Agent": "Java-http-client/21.0.13",
+          "X-Correlation-Id": "3db3e1d2-28f8-4e56-8c0d-1896b8ee592e"
         },
         "cookies": {},
         "browserProxyRequest": false,
-        "loggedDate": 1792350995593,
+        "loggedDate": 1792914448811,
         "bodyAsBase64": "",
         "body": "",
         "protocol": "HTTP/1.1",
         "scheme": "http",
         "host": "localhost",
-        "port": 18090,
-        "loggedDateString": "2026-10-18T19:16:35.593Z",
+        "port": 18190,
+        "loggedDateString": "2026-10-25T07:47:28.811Z",
         "queryParams": {},
         "formParams": {}
       },
       "responseDefinition": {
         "status": 200,
         "jsonBody": {
+          "tenantId": "u4-e2e-96876f85427d46828506e79e8a0cc1d6",
           "cpu": {
             "limit": 20,
             "remaining": 16,
             "used": 4
-          },
-          "tenantId": "u4-e2e-c61153f573834536aed139ac6f67612c"
+          }
         },
         "headers": {
           "Content-Type": "application/json"
@@ -840,10 +840,10 @@
         "status": 200,
         "headers": {
           "Content-Type": "application/json",
-          "Matched-Stub-Id": "974425c8-6694-47a0-b337-0a730cd226cc"
+          "Matched-Stub-Id": "1a7e50c5-e6cc-4eee-9454-99922f0b8c32"
         },
-        "bodyAsBase64": "eyJjcHUiOnsibGltaXQiOjIwLCJyZW1haW5pbmciOjE2LCJ1c2VkIjo0fSwidGVuYW50SWQiOiJ1NC1lMmUtYzYxMTUzZjU3MzgzNDUzNmFlZDEzOWFjNmY2NzYxMmMifQ==",
-        "body": "{\"cpu\":{\"limit\":20,\"remaining\":16,\"used\":4},\"tenantId\":\"u4-e2e-c61153f573834536aed139ac6f67612c\"}"
+        "bodyAsBase64": "eyJ0ZW5hbnRJZCI6InU0LWUyZS05Njg3NmY4NTQyN2Q0NjgyODUwNmU3OWU4YTBjYzFkNiIsImNwdSI6eyJsaW1pdCI6MjAsInJlbWFpbmluZyI6MTYsInVzZWQiOjR9fQ==",
+        "body": "{\"tenantId\":\"u4-e2e-96876f85427d46828506e79e8a0cc1d6\",\"cpu\":{\"limit\":20,\"remaining\":16,\"used\":4}}"
       },
       "wasMatched": true,
       "timing": {
@@ -855,49 +855,49 @@
       },
       "subEvents": [],
       "stubMapping": {
-        "id": "974425c8-6694-47a0-b337-0a730cd226cc",
+        "id": "1a7e50c5-e6cc-4eee-9454-99922f0b8c32",
         "request": {
-          "urlPath": "/api/v1/tenants/u4-e2e-c61153f573834536aed139ac6f67612c/quota",
+          "urlPath": "/api/v1/tenants/u4-e2e-96876f85427d46828506e79e8a0cc1d6/quota",
           "method": "GET"
         },
         "response": {
           "status": 200,
           "jsonBody": {
+            "tenantId": "u4-e2e-96876f85427d46828506e79e8a0cc1d6",
             "cpu": {
               "limit": 20,
               "remaining": 16,
               "used": 4
-            },
-            "tenantId": "u4-e2e-c61153f573834536aed139ac6f67612c"
+            }
           },
           "headers": {
             "Content-Type": "application/json"
           }
         },
-        "uuid": "974425c8-6694-47a0-b337-0a730cd226cc"
+        "uuid": "1a7e50c5-e6cc-4eee-9454-99922f0b8c32"
       }
     },
     {
-      "id": "3bf16a3e-ad52-4805-84da-d8d426bda6c9",
+      "id": "31b7256e-607d-4b2b-b669-04f06ee74252",
       "request": {
         "url": "/api/v1/resources/expired",
-        "absoluteUrl": "http://localhost:18090/api/v1/resources/expired",
+        "absoluteUrl": "http://localhost:18190/api/v1/resources/expired",
         "method": "GET",
         "clientIp": "127.0.0.1",
         "headers": {
-          "x-correlation-id": "fdef24ca-d614-4deb-a159-df18e43e6943",
-          "user-agent": "Java-http-client/21.0.12.1"
+          "x-correlation-id": "9d7929a9-d2a2-4d33-8afc-3f87e1f796c9",
+          "user-agent": "Java-http-client/21.0.13"
         },
         "cookies": {},
         "browserProxyRequest": false,
-        "loggedDate": 1792350995304,
+        "loggedDate": 1792914448607,
         "bodyAsBase64": "",
         "body": "",
         "protocol": "HTTP/2.0",
         "scheme": "http",
         "host": "localhost",
-        "port": 18090,
-        "loggedDateString": "2026-10-18T19:16:35.304Z",
+        "port": 18190,
+        "loggedDateString": "2026-10-25T07:47:28.607Z",
         "queryParams": {},
         "formParams": {}
       },
@@ -915,7 +915,7 @@
         "status": 200,
         "headers": {
           "Content-Type": "application/json",
-          "Matched-Stub-Id": "f5314119-102d-4b07-b78b-4c41055e0d5b"
+          "Matched-Stub-Id": "680abe93-3329-4e21-98f7-4cf12395b4cd"
         },
         "bodyAsBase64": "eyJjb3VudCI6MCwiaXRlbXMiOltdfQ==",
         "body": "{\"count\":0,\"items\":[]}"
@@ -930,7 +930,7 @@
       },
       "subEvents": [],
       "stubMapping": {
-        "id": "f5314119-102d-4b07-b78b-4c41055e0d5b",
+        "id": "680abe93-3329-4e21-98f7-4cf12395b4cd",
         "request": {
           "urlPath": "/api/v1/resources/expired",
           "method": "GET"
@@ -945,34 +945,105 @@
             "Content-Type": "application/json"
           }
         },
-        "uuid": "f5314119-102d-4b07-b78b-4c41055e0d5b"
+        "uuid": "680abe93-3329-4e21-98f7-4cf12395b4cd"
       }
     },
     {
-      "id": "000dbfdd-9b01-4d4e-b334-67c1e980d42b",
+      "id": "77748eba-1462-4955-9444-6794290d4966",
       "request": {
         "url": "/api/v1/resources/expired",
-        "absoluteUrl": "http://localhost:18090/api/v1/resources/expired",
+        "absoluteUrl": "http://localhost:18190/api/v1/resources/expired",
+        "method": "GET",
+        "clientIp": "127.0.0.1",
+        "headers": {
+          "x-correlation-id": "3327f567-75eb-4c89-8bca-bdd427caa568",
+          "user-agent": "Java-http-client/21.0.13"
+        },
+        "cookies": {},
+        "browserProxyRequest": false,
+        "loggedDate": 1792914448102,
+        "bodyAsBase64": "",
+        "body": "",
+        "protocol": "HTTP/2.0",
+        "scheme": "http",
+        "host": "localhost",
+        "port": 18190,
+        "loggedDateString": "2026-10-25T07:47:28.102Z",
+        "queryParams": {},
+        "formParams": {}
+      },
+      "responseDefinition": {
+        "status": 200,
+        "jsonBody": {
+          "count": 0,
+          "items": []
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json",
+          "Matched-Stub-Id": "680abe93-3329-4e21-98f7-4cf12395b4cd"
+        },
+        "bodyAsBase64": "eyJjb3VudCI6MCwiaXRlbXMiOltdfQ==",
+        "body": "{\"count\":0,\"items\":[]}"
+      },
+      "wasMatched": true,
+      "timing": {
+        "addedDelay": 0,
+        "processTime": 0,
+        "responseSendTime": 0,
+        "serveTime": 0,
+        "totalTime": 0
+      },
+      "subEvents": [],
+      "stubMapping": {
+        "id": "680abe93-3329-4e21-98f7-4cf12395b4cd",
+        "request": {
+          "urlPath": "/api/v1/resources/expired",
+          "method": "GET"
+        },
+        "response": {
+          "status": 200,
+          "jsonBody": {
+            "count": 0,
+            "items": []
+          },
+          "headers": {
+            "Content-Type": "application/json"
+          }
+        },
+        "uuid": "680abe93-3329-4e21-98f7-4cf12395b4cd"
+      }
+    },
+    {
+      "id": "bbd0e82f-2470-436a-a5dc-700bc27c6dc5",
+      "request": {
+        "url": "/api/v1/resources/expired",
+        "absoluteUrl": "http://localhost:18190/api/v1/resources/expired",
         "method": "GET",
         "clientIp": "127.0.0.1",
         "headers": {
           "Connection": "Upgrade, HTTP2-Settings",
-          "Host": "localhost:18090",
+          "Host": "localhost:18190",
           "HTTP2-Settings": "AAEAAEAAAAIAAAAAAAMAAAAAAAQBAAAAAAUAAEAAAAYABgAA",
           "Upgrade": "h2c",
-          "User-Agent": "Java-http-client/21.0.12.1",
-          "X-Correlation-Id": "6e0680eb-19c2-4985-b915-b26ae1f9792d"
+          "User-Agent": "Java-http-client/21.0.13",
+          "X-Correlation-Id": "e912dbaf-aacb-42ae-abdb-bc0d728ca2c7"
         },
         "cookies": {},
         "browserProxyRequest": false,
-        "loggedDate": 1792350994759,
+        "loggedDate": 1792914447547,
         "bodyAsBase64": "",
         "body": "",
         "protocol": "HTTP/1.1",
         "scheme": "http",
         "host": "localhost",
-        "port": 18090,
-        "loggedDateString": "2026-10-18T19:16:34.759Z",
+        "port": 18190,
+        "loggedDateString": "2026-10-25T07:47:27.547Z",
         "queryParams": {},
         "formParams": {}
       },
@@ -990,7 +1061,7 @@
         "status": 200,
         "headers": {
           "Content-Type": "application/json",
-          "Matched-Stub-Id": "f5314119-102d-4b07-b78b-4c41055e0d5b"
+          "Matched-Stub-Id": "680abe93-3329-4e21-98f7-4cf12395b4cd"
         },
         "bodyAsBase64": "eyJjb3VudCI6MCwiaXRlbXMiOltdfQ==",
         "body": "{\"count\":0,\"items\":[]}"
@@ -1005,7 +1076,7 @@
       },
       "subEvents": [],
       "stubMapping": {
-        "id": "f5314119-102d-4b07-b78b-4c41055e0d5b",
+        "id": "680abe93-3329-4e21-98f7-4cf12395b4cd",
         "request": {
           "urlPath": "/api/v1/resources/expired",
           "method": "GET"
@@ -1020,12 +1091,12 @@
             "Content-Type": "application/json"
           }
         },
-        "uuid": "f5314119-102d-4b07-b78b-4c41055e0d5b"
+        "uuid": "680abe93-3329-4e21-98f7-4cf12395b4cd"
       }
     }
   ],
   "meta": {
-    "total": 13
+    "total": 14
   },
   "requestJournalDisabled": false
 }

@@ -13,21 +13,7 @@ import org.springframework.web.client.RestClientException;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Supplier;
 
-/**
- * Retry with exponential backoff and jitter (nfr-design.md 8.2), shared by the peer clients.
- *
- * <p>Retried: connect/read timeouts, connection refused ({@link ResourceAccessException}), and
- * HTTP <b>503</b>. NOT retried: any other 4xx or 5xx — a 422 is a final business answer and
- * retrying it would only delay the saga's compensation.
- *
- * <p>Jitter matters because Challenge 1 fires 20 simultaneous requests: without it, 20 retries
- * would re-collide in lockstep.
- *
- * <p>When every attempt fails, the call throws {@link DownstreamUnavailableException} with the
- * code the caller chose ({@code PROVIDER_UNAVAILABLE}, {@code BILLING_UNAVAILABLE}, …) and a
- * detail of the shape {@code "<what> failed after N attempts (<status>)"}, which is exactly the
- * {@code <detail> (<status>)} that {@code FailureReason.of} renders into failure_reason.
- */
+/** Retry transient network failures and HTTP 503 with exponential backoff and jitter. */
 @Component
 public class PeerRetry {
 
@@ -51,15 +37,7 @@ public class PeerRetry {
         this.jitterRatio = jitterRatio;
     }
 
-    /**
-     * Runs {@code call}, retrying only transient failures.
-     *
-     * @param code      the 503 code to report when every attempt fails
-     * @param operation human-readable operation name for the detail string and the logs
-     * @param retryOnReadTimeout {@code false} for the Quota client: a read timeout there is
-     *                           ambiguous (the reservation may have been taken), so only connect
-     *                           failures are retried (nfr-design.md 8.2)
-     */
+    /** Disable read-timeout retries when a remote write may already have committed. */
     public <T> T call(ErrorCode code, String operation, boolean retryOnReadTimeout, Supplier<T> call) {
         RuntimeException last = null;
         int status = 0;

@@ -12,21 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 
-/**
- * R2 (functional-design.md 4.2). {@code instanceId} is read from the linked {@code resources}
- * row (provider_instance_id), NOT a column on reservations — after a compensated saga it is
- * null (A11), which is the queryable "nothing orphaned" evidence (AC-3.5).
- *
- * <p>========================= BUILDING BLOCKS ALREADY CREATED =========================
- * <ul>
- *   <li>{@code reservationRepository.findById(reservationId)} -&gt; Optional&lt;Reservation&gt;
- *   <li>{@code resourceRepository.findById(reservation.getResourceId())} -&gt;
- *       Optional&lt;Resource&gt; (null-safe: resourceId is set at creation, so this is always
- *       present once the reservation exists)
- *   <li>new NotFoundException(ErrorCode.RESERVATION_NOT_FOUND, msg) -&gt; 404
- * </ul>
- * ===================================================================================
- */
+/** Read the provider instance ID from the linked resource row. */
 @Service
 public class ReservationQueryService {
 
