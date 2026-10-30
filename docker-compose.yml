@@ -1,0 +1,147 @@
+# =============================================================================
+# Cloud Resource Manager — full-system container deployment.
+#
+#   docker compose up --build
+#
+# Brings up one PostgreSQL (with all five databases created on first boot) plus
+# the seven microservices, wired to each other by service name over the Compose
+# network. Config is supplied entirely through environment variables; no secrets
+# are baked into images.
+#
+# NOTE: this file was authored during Task 1 as the verification harness for the
+# container images. Task 2 (Vinayak) owns hardening it — per-service healthchecks,
+# the stop/restart demo, and tuning.
+# =============================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      # Reuse the Assignment-1 setup scripts to create all five DBs + least-privilege
+      # users on first boot. Numbered so u1 runs before u2-u4.
+      - ./scripts/db/setup-u1.sql:/docker-entrypoint-initdb.d/01-setup-u1.sql:ro
+      - ./scripts/db/setup-u2-u4.sql:/docker-entrypoint-initdb.d/02-setup-u2-u4.sql:ro
+      - pgdata:/var/lib/postgresql/data
+    # Mapped to 5433 on the host to avoid clashing with a native PostgreSQL on 5432.
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  quota:
+    build: ./services/quota
+    environment:
+      SERVER_PORT: "8081"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: quota_db
+      DB_USER: quota_user
+      DB_PASSWORD: ${DB_PASSWORD:-changeme}
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  resource:
+    build: ./services/resource
+    environment:
+      SERVER_PORT: "8082"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: resource_db
+      DB_USER: resource_user
+      DB_PASSWORD: ${DB_PASSWORD:-changeme}
+      QUOTA_SERVICE_URL: http://quota:8081
+      PROVIDER_SERVICE_URL: http://provider:8085
+      BILLING_SERVICE_URL: http://billing:8083
+      NOTIFICATION_SERVICE_URL: http://notification:8084
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  billing:
+    build: ./services/billing-service
+    environment:
+      SERVER_PORT: "8083"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: billing_db
+      DB_USER: billing_user
+      DB_PASSWORD: ${DB_PASSWORD:-changeme}
+    ports:
+      - "8083:8083"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  notification:
+    build: ./services/notification-service
+    environment:
+      SERVER_PORT: "8084"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: notification_db
+      DB_USER: notification_user
+      DB_PASSWORD: ${DB_PASSWORD:-changeme}
+    ports:
+      - "8084:8084"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  provider:
+    build: ./services/provider
+    environment:
+      SERVER_PORT: "8085"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: provider_db
+      DB_USER: provider_user
+      DB_PASSWORD: ${DB_PASSWORD:-changeme}
+      # Demo-safe: deterministic provider (no random failures), shorter delay.
+      PROVIDER_FAILURE_RATE: "0"
+      PROVIDER_DELAY_MIN_MS: "800"
+      PROVIDER_DELAY_MAX_MS: "1500"
+    ports:
+      - "8085:8085"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  usage-aggregator:
+    build: ./services/usage-aggregator
+    environment:
+      SERVER_PORT: "8086"
+      QUOTA_SERVICE_URL: http://quota:8081
+      BILLING_SERVICE_URL: http://billing:8083
+      RESOURCE_SERVICE_URL: http://resource:8082
+    ports:
+      - "8086:8086"
+    depends_on:
+      - quota
+      - billing
+      - resource
+
+  expiry-worker:
+    build: ./services/expiry-worker
+    environment:
+      SERVER_PORT: "8087"
+      RESOURCE_SERVICE_URL: http://resource:8082
+      # Off by default so it does not terminate demo resources mid-flow.
+      EXPIRY_ENABLED: "false"
+    ports:
+      - "8087:8087"
+    depends_on:
+      - resource
+
+volumes:
+  pgdata:
