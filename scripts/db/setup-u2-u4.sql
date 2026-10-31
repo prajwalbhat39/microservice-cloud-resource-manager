@@ -13,13 +13,18 @@
 -- user, so each user needs CREATE *inside* its schema. Schema grants are
 -- per-database, hence the \connect before each block.
 --
--- SECURITY: 'changeme' is a placeholder matching each service's local default.
--- Override via DB_PASSWORD at runtime for anything that is not a dev laptop.
+-- SECURITY: 'changeme' is a local placeholder. Pass -v db_password=... to psql
+-- to override; Compose supplies DB_PASSWORD through init-compose.sh on first boot.
 -- =============================================================================
+
+\if :{?db_password}
+\else
+\set db_password changeme
+\endif
 
 -- ---------- U2: Billing service (:8083) ----------
 CREATE DATABASE billing_db;
-CREATE USER billing_user WITH PASSWORD 'changeme';
+CREATE USER billing_user WITH PASSWORD :'db_password';
 
 REVOKE ALL     ON DATABASE billing_db FROM PUBLIC;
 GRANT  CONNECT ON DATABASE billing_db TO billing_user;
@@ -32,7 +37,7 @@ GRANT  USAGE, CREATE ON SCHEMA public TO billing_user;
 -- ---------- U3: Provider mock service (:8085) ----------
 \connect postgres
 CREATE DATABASE provider_db;
-CREATE USER provider_user WITH PASSWORD 'changeme';
+CREATE USER provider_user WITH PASSWORD :'db_password';
 
 REVOKE ALL     ON DATABASE provider_db FROM PUBLIC;
 GRANT  CONNECT ON DATABASE provider_db TO provider_user;
@@ -47,7 +52,7 @@ GRANT  USAGE, CREATE ON SCHEMA public TO provider_user;
 -- stateless by design and have no database.
 \connect postgres
 CREATE DATABASE notification_db;
-CREATE USER notification_user WITH PASSWORD 'changeme';
+CREATE USER notification_user WITH PASSWORD :'db_password';
 
 REVOKE ALL     ON DATABASE notification_db FROM PUBLIC;
 GRANT  CONNECT ON DATABASE notification_db TO notification_user;

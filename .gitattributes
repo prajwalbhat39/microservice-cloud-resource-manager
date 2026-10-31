@@ -1,0 +1,2 @@
+scripts/db/*.sh text eol=lf
+scripts/db/*.sql text eol=lf

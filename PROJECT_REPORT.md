@@ -365,6 +365,59 @@ The Google Drive link for the demo video and submission documents has not been s
 The assignment requires an 8–10 minute team video showing the main flow, a failure case and
 challenge demonstrations. Recording and uploading the video remain team deliverables.
 
+## Assignment 2: Vinayak's Compose contribution
+
+Implemented Task 2's deployment configuration in [docker-compose.yml](docker-compose.yml):
+seven separately built Java images and one PostgreSQL 16 container share a bridge network.
+The named `pgdata` volume preserves all five service databases. The init wrapper reuses
+the Assignment 1 SQL scripts and supplies the same environment-driven password used by
+the applications; standalone SQL execution retains its local placeholder default.
+
+```mermaid
+flowchart LR
+    Host --> Resource
+    subgraph crm["Compose crm network: seven app containers + PostgreSQL"]
+        Resource --> Quota
+        Resource --> Provider
+        Resource --> Billing
+        Resource --> Notification
+        Usage --> Quota
+        Usage --> Resource
+        Usage --> Billing
+        Expiry --> Resource
+        Quota & Resource & Provider & Billing & Notification --> Postgres
+    end
+    Postgres --> pgdata[("pgdata: five isolated databases")]
+```
+
+Every Java runtime includes curl for its HTTP healthcheck. TCP readiness prevents
+PostgreSQL's temporary initialization server from releasing dependent services early.
+Resource waits for its four peers to become healthy; Usage and Expiry wait for their
+peers. Peer URLs use service DNS names. All JVMs have a configurable 256 MB heap default.
+Vinayak's Provider Dockerfile remains a Maven/JDK build followed by a Java 21 JRE runtime.
+
+[verify-compose.ps1](scripts/demo/verify-compose.ps1) captures container status and logs,
+asserts provision -> COMPLETED -> ACTIVE through the real peers, checks notification and
+usage data, then recreates containers without deleting the volume. It checks persisted
+identities in all five databases and runs a fresh saga after restart.
+
+**Reflection:** container startup is not application readiness; dependency healthchecks
+must wait for initialization, not just a process or socket. Environment-only credential
+overrides also fail unless first-boot database initialization receives the same values.
+Named volumes outlive containers, so credential rotation is distinct from recreating
+containers. In a real deployment, readiness gates complement application retries,
+explicit password rotation and backup/restore procedures.
+
+**Evidence status:** all 10 mocked Pester regression tests passed. Configuration checks
+verified eight services, an acyclic readiness graph, peer DNS/ports, matching database
+credentials and persistent storage. Shell checks verified password quoting, init ordering,
+error propagation and safe sourcing by the PostgreSQL entrypoint. Docker is unavailable
+in this development environment. Live clean-checkout builds,
+all-eight-container health, inter-service workflow and volume-persistence evidence remain
+pending execution of the verification script on a Docker-enabled machine. Do not claim
+these demonstrations passed until the generated evidence has been reviewed. Vinayak must
+confirm the contribution/reflection and present his Compose/Provider demo segment.
+
 ## Appendix: contributions and AI use
 
 Service ownership is recorded in [units.md](aidlc-docs/inception/units.md). Prajwal owns Quota and
@@ -375,3 +428,6 @@ by the corresponding team members.
 
 OpenAI Codex assisted with implementation, review, documentation and tests. The team remains
 responsible for understanding the code and explaining it in the demonstration.
+
+An AI assistant using Copilot SDK in VS Code assisted with Assignment 2's Compose
+configuration, init wiring, verification script, regression tests and documentation.

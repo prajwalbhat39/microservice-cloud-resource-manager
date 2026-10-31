@@ -94,6 +94,25 @@ config; Siddharth writes K8s manifests + Prometheus config from the contract.
 - `depends_on` alone only waits for a container to *start*, not to be *ready* — use the
   healthcheck condition so apps don't boot before Postgres accepts connections.
 
+**Implementation handoff**
+- [x] [Compose configuration](../../docker-compose.yml): eight containers on `crm`,
+      named `pgdata` volume, environment-driven initialization and peer DNS URLs.
+- [x] Healthchecks for all eight containers and `service_healthy` dependency gates;
+      runtime images include curl and configurable 256 MB JVM heap defaults.
+- [x] [Verification/demo script](../../scripts/demo/verify-compose.ps1) and
+      [regression tests](../../scripts/demo/verify-compose.Tests.ps1) prepared for
+      workflow evidence and `down` -> `up` persistence checks.
+- [x] [Deploy instructions](../../README.md#docker-compose-assignment-2) and
+      [report contribution/reflection](../../PROJECT_REPORT.md#assignment-2-vinayaks-compose-contribution).
+- [ ] Run the verification script on a Docker-enabled machine from a clean checkout;
+      review its `evidence/compose/` output before marking the live-demo checklist above.
+- [ ] Vinayak reviews the report reflection and records his own demo segment.
+
+Docker is unavailable in the implementation environment. Prepared scripts and mocked
+tests do not establish that the live stack or restart demonstration has passed.
+Local validation: 10/10 mocked Pester tests passed, along with Compose structure/contract
+checks, PowerShell/shell syntax checks and initializer quoting/error-propagation checks.
+
 ---
 
 ## Karan — Task 3: Troubleshooting / situated learning (3 marks)
@@ -190,4 +209,5 @@ captured evidence. The handout stresses this as a minimum expectation.
 3. One Postgres container, five databases via the two init scripts (matches A1, preserves the NFR-3 isolation story, fits 6 GB RAM).
 4. `JAVA_TOOL_OPTIONS=-Xmx256m` per service in Compose — 7 JVMs + Postgres on ~6 GB is tight.
 5. `.env.example` placeholders only; never commit a real `.env`.
-6. Billing `/health` is a static custom controller (won't fail when its DB is down, unlike the other six) — note it when writing its healthcheck.
+6. Billing's current `/health` is the Spring Boot Actuator endpoint with database health
+   enabled (not a static custom controller); Compose probes it like the other services.
