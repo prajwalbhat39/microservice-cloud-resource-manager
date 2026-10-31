@@ -15,6 +15,7 @@ COPY src ./src
 RUN --mount=type=cache,target=/root/.m2 mvn -B -ntp -DskipTests clean package
 
 FROM eclipse-temurin:21-jre
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 # Wildcard copy tolerates either naming scheme (<artifactId>-<version>.jar here,
 # <finalName>.jar for the U4 services).

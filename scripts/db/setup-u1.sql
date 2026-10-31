@@ -14,14 +14,18 @@
 --   CREATE *inside* the schema it uses. Schema grants are per-database, so each
 --   block reconnects with \connect before issuing them.
 --
--- SECURITY: 'changeme' is a placeholder. For a shared repo keep it a placeholder
--- here and override via the DB_PASSWORD env var at runtime, OR change it below and
--- do not commit the changed copy. These passwords never appear in application code.
+-- SECURITY: 'changeme' is a local placeholder. Pass -v db_password=... to psql
+-- to override; Compose supplies DB_PASSWORD through init-compose.sh on first boot.
 -- =============================================================================
+
+\if :{?db_password}
+\else
+\set db_password changeme
+\endif
 
 -- ---------- Quota service ----------
 CREATE DATABASE quota_db;
-CREATE USER quota_user WITH PASSWORD 'changeme';
+CREATE USER quota_user WITH PASSWORD :'db_password';
 
 -- Database level: connect only. No CREATE (no new schemas needed),
 -- no TEMPORARY (nothing uses temp tables).
@@ -37,7 +41,7 @@ GRANT  USAGE, CREATE ON SCHEMA public TO quota_user;
 -- ---------- Resource / Orchestrator service ----------
 \connect postgres
 CREATE DATABASE resource_db;
-CREATE USER resource_user WITH PASSWORD 'changeme';
+CREATE USER resource_user WITH PASSWORD :'db_password';
 
 REVOKE ALL     ON DATABASE resource_db FROM PUBLIC;
 GRANT  CONNECT ON DATABASE resource_db TO resource_user;
