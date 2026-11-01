@@ -418,6 +418,24 @@ pending execution of the verification script on a Docker-enabled machine. Do not
 these demonstrations passed until the generated evidence has been reviewed. Vinayak must
 confirm the contribution/reflection and present his Compose/Provider demo segment.
 
+## Assignment 2: Kubernetes deployment — Siddharth
+
+Seven application Deployments and a PostgreSQL StatefulSet run in namespace `crm`.
+Services provide internal DNS names; a ConfigMap supplies runtime settings and a Secret
+supplies credentials. The existing initialization scripts create five isolated databases
+on a persistent volume. Readiness includes database health; liveness uses the application
+liveness group. [Deployment instructions](k8s/README.md) and [test evidence](evidence/k8s/README.md)
+include the commands and observed results.
+
+Verification covers provisioning and peer effects, Provider pod replacement, scaling to
+two Ready Service endpoints and PostgreSQL pod replacement with retained workflow identities.
+The full application test suite and lifecycle integration scenario are recorded separately
+from the Kubernetes checks. The selected advanced capability is self-healing/scaling.
+
+**Reflection:** pod readiness does not establish Service reachability; both need to be
+checked before submitting the workflow. A persistent volume preserves data across pod replacement; it does not provide a backup. Two Ready replicas establish
+scaling behavior, while throughput and traffic distribution require separate measurements.
+
 ## Appendix: contributions and AI use
 
 Service ownership is recorded in [units.md](aidlc-docs/inception/units.md). Prajwal owns Quota and
@@ -426,8 +444,8 @@ The local integration work adds boundary fixes, failure recovery and regression 
 across those services. Individual reflections and final contribution claims must be confirmed
 by the corresponding team members.
 
-OpenAI Codex assisted with implementation, review, documentation and tests. The team remains
+AI tools assisted with implementation, review, documentation and testing. The team remains
 responsible for understanding the code and explaining it in the demonstration.
 
-An AI assistant using Copilot SDK in VS Code assisted with Assignment 2's Compose
-configuration, init wiring, verification script, regression tests and documentation.
+AI assistance was used for the Compose configuration, initialization, verification and documentation.
+AI assistance covered the Kubernetes configuration, testing and documentation.
