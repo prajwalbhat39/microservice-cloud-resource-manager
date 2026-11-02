@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Multi-stage build for the Billing service (Spring Boot, Java 21).
+# Multi-stage build for the Billing service (Spring Boot and Java 21).
 FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /build
 COPY pom.xml .
