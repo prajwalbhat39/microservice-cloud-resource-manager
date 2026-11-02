@@ -16,6 +16,12 @@ service has its own PostgreSQL database and role.
 
 ## Run
 
+### Kubernetes / Minikube (Assignment 2, Part B)
+
+See [deployment and demonstration instructions](k8s/README.md) and
+[captured results](evidence/k8s/README.md). The deployment reuses the existing
+Dockerfiles and database setup scripts.
+
 ### Docker Compose (Assignment 2)
 
 Install Docker with Linux-container support (Docker Desktop on Windows) and Docker

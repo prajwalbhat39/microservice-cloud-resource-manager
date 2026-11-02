@@ -1,0 +1,826 @@
+{
+  "baseline-workflow": {
+    "tenantId": "tnt-k8s-cc723cde071e43bfb68be253ea49ee6e",
+    "accepted": {
+      "reservationId": "bdf49bb6-91be-497e-84df-681d0f34fa00",
+      "resourceId": "6ac41bbc-e8c1-4c88-bc3d-728f008e294a",
+      "status": "PENDING",
+      "statusUrl": "/api/v1/reservations/bdf49bb6-91be-497e-84df-681d0f34fa00"
+    },
+    "resource": {
+      "resourceId": "6ac41bbc-e8c1-4c88-bc3d-728f008e294a",
+      "tenantId": "tnt-k8s-cc723cde071e43bfb68be253ea49ee6e",
+      "type": "VM",
+      "cpu": 4,
+      "ramGb": 8,
+      "status": "ACTIVE",
+      "providerInstanceId": "i-mock-35138c6f-be78-4131-9414-57ec10da3aa7",
+      "createdAt": "2026-11-01T08:27:59.696939Z",
+      "activatedAt": "2026-11-01T08:28:01.242694Z",
+      "expiresAt": "2026-11-02T08:27:59.767802Z",
+      "terminatedAt": null,
+      "failureReason": null
+    },
+    "quota": {
+      "tenantId": "tnt-k8s-cc723cde071e43bfb68be253ea49ee6e",
+      "tier": "STANDARD",
+      "cpu": {
+        "limit": 20,
+        "used": 4,
+        "remaining": 16
+      },
+      "ramGb": {
+        "limit": 64,
+        "used": 8,
+        "remaining": 56
+      },
+      "instances": {
+        "limit": 10,
+        "used": 1,
+        "remaining": 9
+      }
+    },
+    "meter": {
+      "meterId": "9411bc2d-1b18-4a93-ba62-b9d2dd0eabca",
+      "resourceId": "6ac41bbc-e8c1-4c88-bc3d-728f008e294a",
+      "tenantId": "tnt-k8s-cc723cde071e43bfb68be253ea49ee6e",
+      "cpu": 4,
+      "ratePerCpuHour": 0.12,
+      "state": "ACTIVE",
+      "startedAt": "2026-11-01T08:28:01.217153Z",
+      "stoppedAt": null,
+      "currentCost": 0.000133
+    },
+    "notification": {
+      "notificationId": "122b78b6-cd9c-4373-b032-85053b515e19",
+      "tenantId": "tnt-k8s-cc723cde071e43bfb68be253ea49ee6e",
+      "resourceId": "6ac41bbc-e8c1-4c88-bc3d-728f008e294a",
+      "eventType": "ACTIVE",
+      "status": "SENT",
+      "message": "Resource 6ac41bbc-e8c1-4c88-bc3d-728f008e294a is ready (i-mock-35138c6f-be78-4131-9414-57ec10da3aa7)",
+      "attempts": 1,
+      "createdAt": "2026-11-01T08:28:01.261413Z",
+      "sentAt": "2026-11-01T08:28:01.293038Z"
+    },
+    "usage": {
+      "quota": {
+        "tenantId": "tnt-k8s-cc723cde071e43bfb68be253ea49ee6e",
+        "tier": "STANDARD",
+        "cpu": {
+          "limit": 20,
+          "used": 4,
+          "remaining": 16
+        },
+        "ramGb": {
+          "limit": 64,
+          "used": 8,
+          "remaining": 56
+        },
+        "instances": {
+          "limit": 10,
+          "used": 1,
+          "remaining": 9
+        }
+      },
+      "resources": [
+        {
+          "resourceId": "6ac41bbc-e8c1-4c88-bc3d-728f008e294a",
+          "tenantId": "tnt-k8s-cc723cde071e43bfb68be253ea49ee6e",
+          "type": "VM",
+          "cpu": 4,
+          "ramGb": 8,
+          "status": "ACTIVE",
+          "providerInstanceId": "i-mock-35138c6f-be78-4131-9414-57ec10da3aa7",
+          "createdAt": "2026-11-01T08:27:59.696939Z",
+          "activatedAt": "2026-11-01T08:28:01.242694Z",
+          "expiresAt": "2026-11-02T08:27:59.767802Z",
+          "terminatedAt": null,
+          "failureReason": null
+        }
+      ],
+      "cost": {
+        "tenantId": "tnt-k8s-cc723cde071e43bfb68be253ea49ee6e",
+        "period": "2026-11",
+        "totalCost": 0.000133
+      },
+      "availability": {
+        "quota": true,
+        "resources": true,
+        "billing": true
+      }
+    }
+  },
+  "provider-recovery": {
+    "deletedUid": "c9dd39d2-3c52-49da-9bf0-8c64fb678b84",
+    "replacementUid": "b4911406-56af-4ac4-afde-e30f66cad9ca"
+  },
+  "after-provider-recovery": {
+    "tenantId": "tnt-k8s-782e8773107340e7ad5f6093539dba39",
+    "accepted": {
+      "reservationId": "985aa0b7-c7f6-4002-8bf2-421b450b8424",
+      "resourceId": "64303e63-ac14-47d7-8e53-9c0d7d57444a",
+      "status": "PENDING",
+      "statusUrl": "/api/v1/reservations/985aa0b7-c7f6-4002-8bf2-421b450b8424"
+    },
+    "resource": {
+      "resourceId": "64303e63-ac14-47d7-8e53-9c0d7d57444a",
+      "tenantId": "tnt-k8s-782e8773107340e7ad5f6093539dba39",
+      "type": "VM",
+      "cpu": 4,
+      "ramGb": 8,
+      "status": "ACTIVE",
+      "providerInstanceId": "i-mock-10d573f9-c41d-4070-b7d6-cd502a8a016e",
+      "createdAt": "2026-11-01T08:28:08.742726Z",
+      "activatedAt": "2026-11-01T08:28:10.009199Z",
+      "expiresAt": "2026-11-02T08:28:08.754365Z",
+      "terminatedAt": null,
+      "failureReason": null
+    },
+    "quota": {
+      "tenantId": "tnt-k8s-782e8773107340e7ad5f6093539dba39",
+      "tier": "STANDARD",
+      "cpu": {
+        "limit": 20,
+        "used": 4,
+        "remaining": 16
+      },
+      "ramGb": {
+        "limit": 64,
+        "used": 8,
+        "remaining": 56
+      },
+      "instances": {
+        "limit": 10,
+        "used": 1,
+        "remaining": 9
+      }
+    },
+    "meter": {
+      "meterId": "a380c678-8b3a-4ddb-97e3-1b589c3312e3",
+      "resourceId": "64303e63-ac14-47d7-8e53-9c0d7d57444a",
+      "tenantId": "tnt-k8s-782e8773107340e7ad5f6093539dba39",
+      "cpu": 4,
+      "ratePerCpuHour": 0.12,
+      "state": "ACTIVE",
+      "startedAt": "2026-11-01T08:28:10.005347Z",
+      "stoppedAt": null,
+      "currentCost": 0.000133
+    },
+    "notification": {
+      "notificationId": "63795eb9-3aeb-4277-96e3-532bdeb99496",
+      "tenantId": "tnt-k8s-782e8773107340e7ad5f6093539dba39",
+      "resourceId": "64303e63-ac14-47d7-8e53-9c0d7d57444a",
+      "eventType": "ACTIVE",
+      "status": "SENT",
+      "message": "Resource 64303e63-ac14-47d7-8e53-9c0d7d57444a is ready (i-mock-10d573f9-c41d-4070-b7d6-cd502a8a016e)",
+      "attempts": 1,
+      "createdAt": "2026-11-01T08:28:10.014799Z",
+      "sentAt": "2026-11-01T08:28:10.016136Z"
+    },
+    "usage": {
+      "quota": {
+        "tenantId": "tnt-k8s-782e8773107340e7ad5f6093539dba39",
+        "tier": "STANDARD",
+        "cpu": {
+          "limit": 20,
+          "used": 4,
+          "remaining": 16
+        },
+        "ramGb": {
+          "limit": 64,
+          "used": 8,
+          "remaining": 56
+        },
+        "instances": {
+          "limit": 10,
+          "used": 1,
+          "remaining": 9
+        }
+      },
+      "resources": [
+        {
+          "resourceId": "64303e63-ac14-47d7-8e53-9c0d7d57444a",
+          "tenantId": "tnt-k8s-782e8773107340e7ad5f6093539dba39",
+          "type": "VM",
+          "cpu": 4,
+          "ramGb": 8,
+          "status": "ACTIVE",
+          "providerInstanceId": "i-mock-10d573f9-c41d-4070-b7d6-cd502a8a016e",
+          "createdAt": "2026-11-01T08:28:08.742726Z",
+          "activatedAt": "2026-11-01T08:28:10.009199Z",
+          "expiresAt": "2026-11-02T08:28:08.754365Z",
+          "terminatedAt": null,
+          "failureReason": null
+        }
+      ],
+      "cost": {
+        "tenantId": "tnt-k8s-782e8773107340e7ad5f6093539dba39",
+        "period": "2026-11",
+        "totalCost": 0.000133
+      },
+      "availability": {
+        "quota": true,
+        "resources": true,
+        "billing": true
+      }
+    }
+  },
+  "provider-scaling": {
+    "apiVersion": "v1",
+    "items": [
+      {
+        "addressType": "IPv4",
+        "apiVersion": "discovery.k8s.io/v1",
+        "endpoints": [
+          {
+            "addresses": [
+              "10.244.0.35"
+            ],
+            "conditions": {
+              "ready": true,
+              "serving": true,
+              "terminating": false
+            },
+            "nodeName": "crm",
+            "targetRef": {
+              "kind": "Pod",
+              "name": "provider-66c76b5877-k26hp",
+              "namespace": "crm",
+              "uid": "b4911406-56af-4ac4-afde-e30f66cad9ca"
+            }
+          },
+          {
+            "addresses": [
+              "10.244.0.36"
+            ],
+            "conditions": {
+              "ready": true,
+              "serving": true,
+              "terminating": false
+            },
+            "nodeName": "crm",
+            "targetRef": {
+              "kind": "Pod",
+              "name": "provider-66c76b5877-wr6l7",
+              "namespace": "crm",
+              "uid": "7da69b79-4eab-403c-9a4d-5f309b12cf1c"
+            }
+          }
+        ],
+        "kind": "EndpointSlice",
+        "metadata": {
+          "annotations": {
+            "endpoints.kubernetes.io/last-change-trigger-time": "2026-11-01T08:28:17Z"
+          },
+          "creationTimestamp": "2026-11-01T08:01:40Z",
+          "generateName": "provider-",
+          "generation": 37,
+          "labels": {
+            "endpointslice.kubernetes.io/managed-by": "endpointslice-controller.k8s.io",
+            "kubernetes.io/service-name": "provider"
+          },
+          "name": "provider-9nq8p",
+          "namespace": "crm",
+          "ownerReferences": [
+            {
+              "apiVersion": "v1",
+              "blockOwnerDeletion": true,
+              "controller": true,
+              "kind": "Service",
+              "name": "provider",
+              "uid": "5f5f6d95-1606-47a6-ad8c-a5c1a3f387e2"
+            }
+          ],
+          "resourceVersion": "3510",
+          "uid": "0f212454-e112-4b5e-a08b-2615053fd664"
+        },
+        "ports": [
+          {
+            "name": "http",
+            "port": 8085,
+            "protocol": "TCP"
+          }
+        ]
+      }
+    ],
+    "kind": "List",
+    "metadata": {
+      "resourceVersion": ""
+    }
+  },
+  "while-provider-scaled": {
+    "tenantId": "tnt-k8s-a3b47adbc9bd418b920c53e2e5c5f1fb",
+    "accepted": {
+      "reservationId": "65067493-dbcf-49dc-b6c7-c5f2d3eb374f",
+      "resourceId": "302644b6-522b-4f41-8779-719474698ae8",
+      "status": "PENDING",
+      "statusUrl": "/api/v1/reservations/65067493-dbcf-49dc-b6c7-c5f2d3eb374f"
+    },
+    "resource": {
+      "resourceId": "302644b6-522b-4f41-8779-719474698ae8",
+      "tenantId": "tnt-k8s-a3b47adbc9bd418b920c53e2e5c5f1fb",
+      "type": "VM",
+      "cpu": 4,
+      "ramGb": 8,
+      "status": "ACTIVE",
+      "providerInstanceId": "i-mock-a4c1271c-6657-4502-8e83-2f26c5e35e9a",
+      "createdAt": "2026-11-01T08:28:17.825893Z",
+      "activatedAt": "2026-11-01T08:28:19.061412Z",
+      "expiresAt": "2026-11-02T08:28:17.837653Z",
+      "terminatedAt": null,
+      "failureReason": null
+    },
+    "quota": {
+      "tenantId": "tnt-k8s-a3b47adbc9bd418b920c53e2e5c5f1fb",
+      "tier": "STANDARD",
+      "cpu": {
+        "limit": 20,
+        "used": 4,
+        "remaining": 16
+      },
+      "ramGb": {
+        "limit": 64,
+        "used": 8,
+        "remaining": 56
+      },
+      "instances": {
+        "limit": 10,
+        "used": 1,
+        "remaining": 9
+      }
+    },
+    "meter": {
+      "meterId": "c0b039ec-2631-4013-9e90-019131ced01a",
+      "resourceId": "302644b6-522b-4f41-8779-719474698ae8",
+      "tenantId": "tnt-k8s-a3b47adbc9bd418b920c53e2e5c5f1fb",
+      "cpu": 4,
+      "ratePerCpuHour": 0.12,
+      "state": "ACTIVE",
+      "startedAt": "2026-11-01T08:28:19.057024Z",
+      "stoppedAt": null,
+      "currentCost": 0.000133
+    },
+    "notification": {
+      "notificationId": "eb623aef-056f-4eb6-b7a9-63d220cc4dde",
+      "tenantId": "tnt-k8s-a3b47adbc9bd418b920c53e2e5c5f1fb",
+      "resourceId": "302644b6-522b-4f41-8779-719474698ae8",
+      "eventType": "ACTIVE",
+      "status": "SENT",
+      "message": "Resource 302644b6-522b-4f41-8779-719474698ae8 is ready (i-mock-a4c1271c-6657-4502-8e83-2f26c5e35e9a)",
+      "attempts": 1,
+      "createdAt": "2026-11-01T08:28:19.067094Z",
+      "sentAt": "2026-11-01T08:28:19.068565Z"
+    },
+    "usage": {
+      "quota": {
+        "tenantId": "tnt-k8s-a3b47adbc9bd418b920c53e2e5c5f1fb",
+        "tier": "STANDARD",
+        "cpu": {
+          "limit": 20,
+          "used": 4,
+          "remaining": 16
+        },
+        "ramGb": {
+          "limit": 64,
+          "used": 8,
+          "remaining": 56
+        },
+        "instances": {
+          "limit": 10,
+          "used": 1,
+          "remaining": 9
+        }
+      },
+      "resources": [
+        {
+          "resourceId": "302644b6-522b-4f41-8779-719474698ae8",
+          "tenantId": "tnt-k8s-a3b47adbc9bd418b920c53e2e5c5f1fb",
+          "type": "VM",
+          "cpu": 4,
+          "ramGb": 8,
+          "status": "ACTIVE",
+          "providerInstanceId": "i-mock-a4c1271c-6657-4502-8e83-2f26c5e35e9a",
+          "createdAt": "2026-11-01T08:28:17.825893Z",
+          "activatedAt": "2026-11-01T08:28:19.061412Z",
+          "expiresAt": "2026-11-02T08:28:17.837653Z",
+          "terminatedAt": null,
+          "failureReason": null
+        }
+      ],
+      "cost": {
+        "tenantId": "tnt-k8s-a3b47adbc9bd418b920c53e2e5c5f1fb",
+        "period": "2026-11",
+        "totalCost": 0.000133
+      },
+      "availability": {
+        "quota": true,
+        "resources": true,
+        "billing": true
+      }
+    }
+  },
+  "persisted-workflow": {
+    "tenantId": "tnt-k8s-cc723cde071e43bfb68be253ea49ee6e",
+    "accepted": {
+      "reservationId": "bdf49bb6-91be-497e-84df-681d0f34fa00",
+      "resourceId": "6ac41bbc-e8c1-4c88-bc3d-728f008e294a",
+      "status": "PENDING",
+      "statusUrl": "/api/v1/reservations/bdf49bb6-91be-497e-84df-681d0f34fa00"
+    },
+    "resource": {
+      "resourceId": "6ac41bbc-e8c1-4c88-bc3d-728f008e294a",
+      "tenantId": "tnt-k8s-cc723cde071e43bfb68be253ea49ee6e",
+      "type": "VM",
+      "cpu": 4,
+      "ramGb": 8,
+      "status": "ACTIVE",
+      "providerInstanceId": "i-mock-35138c6f-be78-4131-9414-57ec10da3aa7",
+      "createdAt": "2026-11-01T08:27:59.696939Z",
+      "activatedAt": "2026-11-01T08:28:01.242694Z",
+      "expiresAt": "2026-11-02T08:27:59.767802Z",
+      "terminatedAt": null,
+      "failureReason": null
+    },
+    "quota": {
+      "tenantId": "tnt-k8s-cc723cde071e43bfb68be253ea49ee6e",
+      "tier": "STANDARD",
+      "cpu": {
+        "limit": 20,
+        "used": 4,
+        "remaining": 16
+      },
+      "ramGb": {
+        "limit": 64,
+        "used": 8,
+        "remaining": 56
+      },
+      "instances": {
+        "limit": 10,
+        "used": 1,
+        "remaining": 9
+      }
+    },
+    "meter": {
+      "meterId": "9411bc2d-1b18-4a93-ba62-b9d2dd0eabca",
+      "resourceId": "6ac41bbc-e8c1-4c88-bc3d-728f008e294a",
+      "tenantId": "tnt-k8s-cc723cde071e43bfb68be253ea49ee6e",
+      "cpu": 4,
+      "ratePerCpuHour": 0.12,
+      "state": "ACTIVE",
+      "startedAt": "2026-11-01T08:28:01.217153Z",
+      "stoppedAt": null,
+      "currentCost": 0.005867
+    },
+    "notification": {
+      "notificationId": "122b78b6-cd9c-4373-b032-85053b515e19",
+      "tenantId": "tnt-k8s-cc723cde071e43bfb68be253ea49ee6e",
+      "resourceId": "6ac41bbc-e8c1-4c88-bc3d-728f008e294a",
+      "eventType": "ACTIVE",
+      "status": "SENT",
+      "message": "Resource 6ac41bbc-e8c1-4c88-bc3d-728f008e294a is ready (i-mock-35138c6f-be78-4131-9414-57ec10da3aa7)",
+      "attempts": 1,
+      "createdAt": "2026-11-01T08:28:01.261413Z",
+      "sentAt": "2026-11-01T08:28:01.293038Z"
+    },
+    "usage": {
+      "quota": {
+        "tenantId": "tnt-k8s-cc723cde071e43bfb68be253ea49ee6e",
+        "tier": "STANDARD",
+        "cpu": {
+          "limit": 20,
+          "used": 4,
+          "remaining": 16
+        },
+        "ramGb": {
+          "limit": 64,
+          "used": 8,
+          "remaining": 56
+        },
+        "instances": {
+          "limit": 10,
+          "used": 1,
+          "remaining": 9
+        }
+      },
+      "resources": [
+        {
+          "resourceId": "6ac41bbc-e8c1-4c88-bc3d-728f008e294a",
+          "tenantId": "tnt-k8s-cc723cde071e43bfb68be253ea49ee6e",
+          "type": "VM",
+          "cpu": 4,
+          "ramGb": 8,
+          "status": "ACTIVE",
+          "providerInstanceId": "i-mock-35138c6f-be78-4131-9414-57ec10da3aa7",
+          "createdAt": "2026-11-01T08:27:59.696939Z",
+          "activatedAt": "2026-11-01T08:28:01.242694Z",
+          "expiresAt": "2026-11-02T08:27:59.767802Z",
+          "terminatedAt": null,
+          "failureReason": null
+        }
+      ],
+      "cost": {
+        "tenantId": "tnt-k8s-cc723cde071e43bfb68be253ea49ee6e",
+        "period": "2026-11",
+        "totalCost": 0.005867
+      },
+      "availability": {
+        "quota": true,
+        "resources": true,
+        "billing": true
+      }
+    }
+  },
+  "database-recovery": {
+    "deletedPodUid": "d53c0b3f-f20b-4831-9434-a7881a3a35ae",
+    "replacementPodUid": "baad75b6-281e-4678-ba6e-29da86e900b8",
+    "pvcUid": "0bd61dcd-37b5-449d-9720-40ffec5262d1",
+    "volume": "pvc-0bd61dcd-37b5-449d-9720-40ffec5262d1"
+  },
+  "after-database-recovery": {
+    "tenantId": "tnt-k8s-493c52207c374208949a4a3f8953229a",
+    "accepted": {
+      "reservationId": "542011b7-6221-4395-8854-1fb0681d48ba",
+      "resourceId": "7a7e353b-be25-4314-8228-3bf2e35fc3d6",
+      "status": "PENDING",
+      "statusUrl": "/api/v1/reservations/542011b7-6221-4395-8854-1fb0681d48ba"
+    },
+    "resource": {
+      "resourceId": "7a7e353b-be25-4314-8228-3bf2e35fc3d6",
+      "tenantId": "tnt-k8s-493c52207c374208949a4a3f8953229a",
+      "type": "VM",
+      "cpu": 4,
+      "ramGb": 8,
+      "status": "ACTIVE",
+      "providerInstanceId": "i-mock-65c26e7e-cbb3-450b-bac1-0738ff87dff6",
+      "createdAt": "2026-11-01T08:28:45.791997Z",
+      "activatedAt": "2026-11-01T08:28:46.675455Z",
+      "expiresAt": "2026-11-02T08:28:45.806315Z",
+      "terminatedAt": null,
+      "failureReason": null
+    },
+    "quota": {
+      "tenantId": "tnt-k8s-493c52207c374208949a4a3f8953229a",
+      "tier": "STANDARD",
+      "cpu": {
+        "limit": 20,
+        "used": 4,
+        "remaining": 16
+      },
+      "ramGb": {
+        "limit": 64,
+        "used": 8,
+        "remaining": 56
+      },
+      "instances": {
+        "limit": 10,
+        "used": 1,
+        "remaining": 9
+      }
+    },
+    "meter": {
+      "meterId": "44b47fe0-8faf-4f0e-9e74-0616cdad9f90",
+      "resourceId": "7a7e353b-be25-4314-8228-3bf2e35fc3d6",
+      "tenantId": "tnt-k8s-493c52207c374208949a4a3f8953229a",
+      "cpu": 4,
+      "ratePerCpuHour": 0.12,
+      "state": "ACTIVE",
+      "startedAt": "2026-11-01T08:28:46.670639Z",
+      "stoppedAt": null,
+      "currentCost": 0.0
+    },
+    "notification": {
+      "notificationId": "2ad666df-76c4-4ea8-9953-5e011a3cdd1e",
+      "tenantId": "tnt-k8s-493c52207c374208949a4a3f8953229a",
+      "resourceId": "7a7e353b-be25-4314-8228-3bf2e35fc3d6",
+      "eventType": "ACTIVE",
+      "status": "SENT",
+      "message": "Resource 7a7e353b-be25-4314-8228-3bf2e35fc3d6 is ready (i-mock-65c26e7e-cbb3-450b-bac1-0738ff87dff6)",
+      "attempts": 1,
+      "createdAt": "2026-11-01T08:28:46.681560Z",
+      "sentAt": "2026-11-01T08:28:46.683361Z"
+    },
+    "usage": {
+      "quota": {
+        "tenantId": "tnt-k8s-493c52207c374208949a4a3f8953229a",
+        "tier": "STANDARD",
+        "cpu": {
+          "limit": 20,
+          "used": 4,
+          "remaining": 16
+        },
+        "ramGb": {
+          "limit": 64,
+          "used": 8,
+          "remaining": 56
+        },
+        "instances": {
+          "limit": 10,
+          "used": 1,
+          "remaining": 9
+        }
+      },
+      "resources": [
+        {
+          "resourceId": "7a7e353b-be25-4314-8228-3bf2e35fc3d6",
+          "tenantId": "tnt-k8s-493c52207c374208949a4a3f8953229a",
+          "type": "VM",
+          "cpu": 4,
+          "ramGb": 8,
+          "status": "ACTIVE",
+          "providerInstanceId": "i-mock-65c26e7e-cbb3-450b-bac1-0738ff87dff6",
+          "createdAt": "2026-11-01T08:28:45.791997Z",
+          "activatedAt": "2026-11-01T08:28:46.675455Z",
+          "expiresAt": "2026-11-02T08:28:45.806315Z",
+          "terminatedAt": null,
+          "failureReason": null
+        }
+      ],
+      "cost": {
+        "tenantId": "tnt-k8s-493c52207c374208949a4a3f8953229a",
+        "period": "2026-11",
+        "totalCost": 0.0
+      },
+      "availability": {
+        "quota": true,
+        "resources": true,
+        "billing": true
+      }
+    }
+  },
+  "termination": {
+    "meter": {
+      "meterId": "44b47fe0-8faf-4f0e-9e74-0616cdad9f90",
+      "resourceId": "7a7e353b-be25-4314-8228-3bf2e35fc3d6",
+      "tenantId": "tnt-k8s-493c52207c374208949a4a3f8953229a",
+      "cpu": 4,
+      "ratePerCpuHour": 0.12,
+      "state": "STOPPED",
+      "startedAt": "2026-11-01T08:28:46.670639Z",
+      "stoppedAt": "2026-11-01T08:28:48.472763Z",
+      "currentCost": 0.000133
+    },
+    "quota": {
+      "tenantId": "tnt-k8s-493c52207c374208949a4a3f8953229a",
+      "tier": "STANDARD",
+      "cpu": {
+        "limit": 20,
+        "used": 0,
+        "remaining": 20
+      },
+      "ramGb": {
+        "limit": 64,
+        "used": 0,
+        "remaining": 64
+      },
+      "instances": {
+        "limit": 10,
+        "used": 0,
+        "remaining": 10
+      }
+    },
+    "resource": {
+      "resourceId": "7a7e353b-be25-4314-8228-3bf2e35fc3d6",
+      "tenantId": "tnt-k8s-493c52207c374208949a4a3f8953229a",
+      "type": "VM",
+      "cpu": 4,
+      "ramGb": 8,
+      "status": "TERMINATED",
+      "providerInstanceId": "i-mock-65c26e7e-cbb3-450b-bac1-0738ff87dff6",
+      "createdAt": "2026-11-01T08:28:45.791997Z",
+      "activatedAt": "2026-11-01T08:28:46.675455Z",
+      "expiresAt": "2026-11-02T08:28:45.806315Z",
+      "terminatedAt": "2026-11-01T08:28:47.368034Z",
+      "failureReason": null
+    }
+  },
+  "summary": {
+    "startedAt": "2026-11-01T08:27:49.220073+00:00",
+    "context": "crm",
+    "namespace": "crm",
+    "status": "passed",
+    "checks": [
+      "seven service health/liveness endpoints",
+      "five database role logins",
+      "provisioning and real peer effects",
+      "idempotent replay and payload rejection",
+      "Provider pod replacement",
+      "two Provider replicas and Service endpoints",
+      "workflow through the scaled Service",
+      "PostgreSQL pod replacement and PVC persistence",
+      "new provisioning after database recovery",
+      "termination and peer cleanup"
+    ],
+    "finishedAt": "2026-11-01T08:28:48.842743+00:00"
+  },
+  "regression": {
+    "javaVersion": "21.0.13",
+    "mavenVersion": "3.9.16",
+    "javaTests": {
+      "notification-service": {
+        "tests": 10,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "provider": {
+        "tests": 36,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "expiry-worker": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "usage-aggregator": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "quota": {
+        "tests": 16,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "billing-service": {
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "resource": {
+        "tests": 55,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    "fullStackIntegration": [
+      "PASS: 20 concurrent quota requests, five accepted at capacity, 15 rejected; releases apply once",
+      "PASS: provisioning, ACTIVE notification, usage, available zero cost, replay and payload mismatch",
+      "PASS: manual termination, provider shutdown, stable stopped cost, quota release, TERMINATED notification",
+      "PASS: real Billing 503, saga compensation, provider cleanup, quota refund and FAILED notification",
+      "PASS: scheduled expiry through real Resource, provider shutdown, meter stop, quota release and notification",
+      "PASS: durable teardown survives Resource restart during Billing outage",
+      "PASS: partial and total peer outage; worker remains running"
+    ]
+  },
+  "additional-kubernetes-lifecycle": {
+    "missingIdempotencyKey": "rejected with HTTP 400",
+    "billingFailureCompensation": {
+      "reservation": {
+        "reservationId": "1fe8a6fa-6e74-467c-9356-ca8e26eb790d",
+        "status": "FAILED",
+        "resourceId": "04872239-332e-416c-b1b1-a4311713227d",
+        "instanceId": null,
+        "failureReason": "BILLING_UNAVAILABLE: billing meter start failed after 3 attempts (503)",
+        "createdAt": "2026-11-01T08:24:51.522149Z",
+        "updatedAt": "2026-11-01T08:24:53.082162Z"
+      },
+      "quotaReleased": true,
+      "providerTerminated": true,
+      "billingMeterAbsent": true,
+      "notification": "SENT"
+    },
+    "durableTeardown": {
+      "resourceId": "d2703990-be8b-4ea1-9ef1-9f2df143c5d0",
+      "queuedDuringBillingOutage": true,
+      "resourcePodRestarted": true,
+      "cleanupCompleted": true
+    },
+    "partialPeerOutage": {
+      "quota": true,
+      "resources": true,
+      "billing": false
+    },
+    "scheduledExpiry": {
+      "resourceId": "0344f70d-c27f-4940-93a8-711d80c3eb3b",
+      "terminatedByWorker": true,
+      "quotaReleased": true,
+      "providerTerminated": true,
+      "billingCostStable": true,
+      "notification": "SENT"
+    }
+  },
+  "host-entrypoint": {
+    "url": "http://127.0.0.1:18082",
+    "tenantId": "tnt-host-651e8517955341f3abb7f909c000b0c3",
+    "resourceId": "b8f5c7ce-0af8-4c8c-bdb6-271c3ca884b8",
+    "reservationId": "f427b01e-8724-4486-bc32-fae269cf1c5b",
+    "resourceStatus": "ACTIVE",
+    "providerInstanceId": "i-mock-8784e2ac-857c-4f47-9adb-6a5da23274e0",
+    "billingState": "ACTIVE",
+    "notificationStatus": "SENT",
+    "usageAvailability": {
+      "quota": true,
+      "resources": true,
+      "billing": true
+    },
+    "healthHttpStatus": 200,
+    "swaggerHttpStatus": 200
+  }
+}

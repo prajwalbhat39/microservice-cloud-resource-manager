@@ -32,3 +32,7 @@ logs/
 
 # Local Word reference documents
 *.docx
+
+# Local Kubernetes verification runs
+evidence/k8s/runs/
+.local-verification/

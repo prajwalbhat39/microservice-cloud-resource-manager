@@ -85,9 +85,9 @@ There are no cross-service foreign keys. Aggregator and Worker have no datasourc
 - Notification health checks its database. Aggregator and Worker health exclude peer availability.
 - Maven wrappers verify the distribution checksum. Dependabot covers these three projects.
 
-Framework errors use ENDPOINT_NOT_FOUND (404), NOT_ACCEPTABLE (406) and UNSUPPORTED_MEDIA_TYPE
-(415). Other framework statuses use HTTP_<status>. OpenAPI includes these services' response
-schemas and the unhealthy-service response.
+Framework errors use ENDPOINT_NOT_FOUND (404), METHOD_NOT_ALLOWED (405), NOT_ACCEPTABLE (406),
+UNSUPPORTED_MEDIA_TYPE (415) and INTERNAL_ERROR (500). Other framework statuses use HTTP_<status>.
+OpenAPI includes these services' response schemas and the unhealthy-service response.
 
 ## Tests
 
@@ -129,4 +129,4 @@ peer recovery or restart; the worker does not need terminated rows in the expire
 
 ## AI use
 
-OpenAI Codex assisted with implementation, documentation and tests.
+AI tools assisted with implementation, documentation and testing.

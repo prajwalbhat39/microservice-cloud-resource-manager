@@ -285,17 +285,17 @@ Testing:
 
 **Usage Aggregator:**
 - ✅ Compose usage view from 3 services:
-  - Call Quota: `GET /tenants/{id}/quota`
-  - Call Resource/Orchestrator: `GET /resources?tenantId={id}&status=ACTIVE`
-  - Call Billing: `GET /tenants/{id}/cost?period=YYYY-MM`
+  - Call Quota: `GET /api/v1/tenants/{id}/quota`
+  - Call Resource/Orchestrator: `GET /api/v1/resources?tenantId={id}&status=ACTIVE`
+  - Call Billing: `GET /api/v1/billing/tenants/{id}/cost?period=YYYY-MM`
 - ✅ Graceful degradation (FR-37): if one service fails, return partial data with availability flags
 - ✅ Error handling
 - ✅ All unit tests (with WireMock for upstream services)
 
 **Expiry Worker:**
 - ✅ Scheduled job (runs every 30 seconds, configurable)
-- ✅ Call Orchestrator: `GET /resources/expired`
-- ✅ For each expired resource: `POST /resources/{id}/termination`
+- ✅ Call Orchestrator: `GET /api/v1/resources/expired`
+- ✅ For each expired resource: `POST /api/v1/resources/{id}/termination`
 - ✅ Log actions
 - ✅ Idempotency: termination endpoint is idempotent (FR-25, AC-7.2)
 - ✅ All unit tests (with WireMock for orchestrator)
@@ -309,16 +309,17 @@ Best-effort notification service (sits outside saga compensation path).
 APIs:
 - POST /api/v1/notifications: Record and send notification
   - Input: { "tenantId", "resourceId", "eventType", "message" }
-  - Output: 202 (always accepted)
+  - Output: 202 after persistence; 400 for invalid input; 503 when persistence is unavailable
   
 - GET /api/v1/notifications?tenantId={id}: Query notification history
-  - Output: list of notifications with status (SENT/FAILED)
+  - Output: list of notifications with status (PENDING/SENT/FAILED)
 
 Implementation:
 - Insert notification row with status=PENDING
-- Log message to console (simulates email/SMS)
-- Mark status=SENT
-- Always return 202 (best effort, never fails)
+- Simulate delivery and log event identifiers
+- Mark SENT on success; retry PENDING records within the attempt budget
+- Mark FAILED when the attempt budget is exhausted
+- Delivery failure stays outside saga compensation; persistence errors return 503
 
 Testing:
 - Unit test: notification recorded and marked SENT
@@ -352,12 +353,12 @@ Testing:
 
 **Expiry Worker:**
 ```
-Scheduled background job (no HTTP endpoints, no database).
+Scheduled background job with health/OpenAPI endpoints and no database.
 
 Job:
 - Runs every 30 seconds (configurable: EXPIRY_CHECK_INTERVAL_MS)
-- Call Orchestrator: GET /resources/expired
-- For each expired resource: POST /resources/{id}/termination
+- Call Orchestrator: GET /api/v1/resources/expired
+- For each expired resource: POST /api/v1/resources/{id}/termination
 - Log each termination action
 
 Configuration:
@@ -526,7 +527,7 @@ graph TD
 - **Integration test:** Real database test for client token idempotency
 
 ### U4 (Siddharth)
-- **Notification unit tests:** Record, query, always 202
+- **Notification tests:** Record, query, delivery retries, validation errors and persistence failures
 - **Aggregator unit tests:** API composition, graceful degradation (with WireMock upstream)
 - **Worker unit tests:** Scheduled job, termination calls (with WireMock orchestrator)
 

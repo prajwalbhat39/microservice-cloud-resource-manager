@@ -1,0 +1,36 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: crm
+resources:
+  - namespace.yaml
+  - applications.yaml
+  - postgres.yaml
+  - ../scripts/db
+configMapGenerator:
+  - name: crm-config
+    literals:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - JAVA_TOOL_OPTIONS=-Xmx256m
+      - MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true
+      - QUOTA_SERVICE_URL=http://quota:8081
+      - RESOURCE_SERVICE_URL=http://resource:8082
+      - BILLING_SERVICE_URL=http://billing:8083
+      - NOTIFICATION_SERVICE_URL=http://notification:8084
+      - PROVIDER_SERVICE_URL=http://provider:8085
+      - PROVIDER_FAILURE_RATE=0
+      - PROVIDER_DELAY_MIN_MS=800
+      - PROVIDER_DELAY_MAX_MS=1500
+      - EXPIRY_ENABLED=false
+secretGenerator:
+  - name: crm-db
+    envs:
+      - .env
+patches:
+  - path: app-defaults.yaml
+    target:
+      kind: Deployment
+  - path: database-apps.yaml
+    target:
+      kind: Deployment
+      labelSelector: crm/database=true
