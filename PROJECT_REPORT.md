@@ -37,6 +37,8 @@ PostgreSQL container. Five separate databases and roles preserve logical service
 ownership while sharing the database server. Provider simulates infrastructure;
 the deployment does not create real cloud virtual machines.
 
+### Application Communication Diagram
+
 ```mermaid
 flowchart LR
     Client["Client / verification script"]
@@ -71,6 +73,67 @@ flowchart LR
 Container-to-container traffic uses service DNS names, such as
 `http://provider:8085`, rather than `localhost`. Host HTTP ports are 8081-8087;
 PostgreSQL is published on host port 5433.
+
+### Deployment Architecture Diagram
+
+The diagram below shows the Windows Compose deployment used for the captured
+happy-path run. Solid arrows represent build output, requests or storage access;
+dashed arrows represent deployment configuration. The Kubernetes deployment in
+Section 4 is a separate deployment, not another layer of this Compose stack.
+
+```mermaid
+flowchart TB
+    Source["Repository<br/>Seven service directories and Dockerfiles"]
+    Build["Multi-stage builds<br/>Maven + JDK 21"]
+    Images["Seven independent application images<br/>Java 21 JRE + application JAR + curl"]
+    Config["Compose configuration + local environment<br/>Ports, peer URLs, credentials and healthchecks"]
+    Init["Read-only initialization scripts<br/>Create five databases and service roles"]
+
+    subgraph Host["Windows host"]
+        Client["PowerShell verifier / API client"]
+        Ports["Docker-published HTTP ports<br/>localhost:8081-8087"]
+        DBPort["Optional host database access<br/>localhost:5433"]
+
+        subgraph Engine["Docker Desktop Linux engine - WSL 2"]
+            subgraph Network["Compose-managed crm bridge network"]
+                subgraph Apps["Seven application containers"]
+                    Q["quota:8081"]
+                    R["resource:8082"]
+                    B["billing:8083"]
+                    N["notification:8084"]
+                    P["provider:8085"]
+                    U["usage-aggregator:8086"]
+                    E["expiry-worker:8087<br/>Automatic expiry disabled"]
+                end
+                PG["postgres:5432<br/>PostgreSQL 16 container"]
+                DataOwners["Database clients<br/>Quota, Resource, Billing, Notification, Provider"]
+            end
+            Volume[("Named pgdata volume<br/>Five databases<br/>Mounted at /var/lib/postgresql/data")]
+        end
+    end
+
+    Source --> Build
+    Build --> Images
+    Images -.->|Compose starts containers| Apps
+    Config -.-> Apps
+    Config -.-> PG
+    Init -.->|First boot of an empty volume| PG
+    Client --> Ports
+    Ports -->|Port mappings to corresponding services| Apps
+    DBPort -->|5433 to 5432| PG
+    Apps -->|Five data-owning services only| DataOwners
+    DataOwners -->|PostgreSQL connections over crm| PG
+    PG --> Volume
+```
+
+**Startup readiness:** PostgreSQL becomes healthy before its five application
+clients start. Resource also waits for its four peers; Usage and Expiry wait for
+their required services. These gates are configuration dependencies, not HTTP
+request paths. Usage and Expiry have no database connection of their own.
+
+**Storage lifetime:** removing containers with `docker compose down` retains
+`pgdata`; using `down -v` removes it. The diagram shows the configured persistence
+design, not proof of the still-pending Compose restart demonstration.
 
 ## 2. Docker Containerization and Docker Compose Deployment
 
