@@ -1,451 +1,278 @@
-# Cloud Resource Manager: Design and Development
+# Assignment 2: Containerization and Deployment
 
-Course: SEZG583 Scalable Services, Assignment 1.
+**Application:** Cloud Resource Manager  
+**Course:** SEZG583 Scalable Services  
+**Team:** Prajwal, Vinayak, Karan and Siddharth  
+**Report date:** 3 November 2026
 
-## 1. Problem and scope
+This report summarizes the implementation and available deployment evidence.
+Compose results were captured on 2 November 2026; the repository's Kubernetes
+evidence records verification on 1 November 2026. These are recorded results, not
+a claim that the deployments were rerun during report preparation.
 
-The system provisions simulated compute resources for tenants with fixed subscription quotas.
-A request must stay within CPU, RAM and instance limits. Retries must preserve the original
-operation, and failed provisioning must release its allocation and stop uncertain remote effects.
+## 1. Brief Application Overview and Deployment Architecture
 
-Supported resource types are VM, CONTAINER and CLUSTER. Tiers are immutable after creation:
+Cloud Resource Manager is a seven-service Java 21 application developed in
+Assignment 1. It provisions simulated computing resources for tenants while
+enforcing CPU, RAM and instance quotas. Resource coordinates a saga: reserve
+quota, provision infrastructure through Provider, start Billing, and record the
+successful lifecycle through Notification. Clients receive an asynchronous
+acceptance response and poll until the reservation is `COMPLETED` and the
+resource is `ACTIVE`. Usage Aggregator combines information from the services;
+Expiry Worker requests termination of expired resources.
 
-| Tier | CPU | RAM GB | Instances | Restriction |
-|---|---:|---:|---:|---|
-| FREE | 2 | 4 | 1 | No CLUSTER |
-| STANDARD | 20 | 64 | 10 | None |
-| ENTERPRISE | 200 | 512 | 100 | None |
+| Service | Port | Responsibility | Database |
+|---|---:|---|---|
+| Quota | 8081 | Tenant limits, quota admission and release | quota_db |
+| Resource | 8082 | Resource lifecycle, idempotency and saga coordination | resource_db |
+| Billing | 8083 | Billing meters and cost calculation | billing_db |
+| Notification | 8084 | Lifecycle history and simulated delivery | notification_db |
+| Provider | 8085 | Simulated infrastructure provisioning | provider_db |
+| Usage Aggregator | 8086 | Combined quota, resource and billing view | None |
+| Expiry Worker | 8087 | Scheduled termination requests | None |
 
-| Rule | Enforcement | Verification |
-|---|---|---|
-| BR1: quota cannot be exceeded | Conditional SQL update and database checks | Quota concurrency tests; Challenge 1 |
-| BR2: provisioning is idempotent | Unique key, request fingerprint and stored response | Resource concurrency tests; Challenge 2 |
-| BR3: changed payload is rejected | SHA-256 fingerprint comparison | Payload-mismatch tests |
-| BR4: lifecycle transitions are explicit | ResourceLifecycle and atomic termination guard | Lifecycle and HTTP tests |
-| BR5: stopped billing does not accrue | Serialized meter stop and persisted timestamp | StoppedCostTest and PostgreSQL tests |
-| BR6: compensation releases quota | Durable cleanup and idempotent peer operations | RecoveryIT; Challenge 3C; process test |
-| BR7: release applies once | Conditional reservation-state update | Concurrent release tests |
-| BR8: FREE cannot provision CLUSTER | Tier policy before reservation | Tier policy and HTTP tests |
-
-Authentication, real infrastructure, payment collection, a graphical interface and cloud
-deployment are outside this assignment. Tenant identity is supplied explicitly in requests.
-
-## 2. Service decomposition
-
-| Service | Owner | Responsibility | Database |
-|---|---|---|---|
-| Quota, 8081 | Prajwal | Tenants, tier policy, quota admission and release | quota_db |
-| Resource, 8082 | Prajwal | Resource lifecycle, idempotency and orchestration | resource_db |
-| Billing, 8083 | Karan | Meter start/stop, cost and monthly aggregation | billing_db |
-| Notification, 8084 | Siddharth | Lifecycle history and simulated delivery retries | notification_db |
-| Provider, 8085 | Vinayak | Idempotent infrastructure simulation | provider_db |
-| Usage Aggregator, 8086 | Siddharth | Compose quota, active resources and cost | None |
-| Expiry Worker, 8087 | Siddharth | Request termination of expired resources | None |
-
-Quota keeps policy, counters and its reservation ledger in one local consistency boundary.
-Resource owns workflow state while calling other services through their APIs. Billing owns
-money and elapsed-time calculations. Notification failures do not invalidate provisioning.
-Provider is the independently slow or unreliable dependency required by the assignment.
-Usage and Expiry own no copied business data.
-
-A shared database would simplify transactions but remove service isolation. A separate Tenant
-service would add a network call to quota admission. A reporting database would require
-replication and a staleness policy; direct composition is sufficient for this workload.
-
-## 3. Architecture
-
-### Components
+Assignment 2 packages the services into independent images and deploys them
+together. Compose uses eight containers: seven application containers and one
+PostgreSQL container. Five separate databases and roles preserve logical service
+ownership while sharing the database server. Provider simulates infrastructure;
+the deployment does not create real cloud virtual machines.
 
 ```mermaid
 flowchart LR
-    Client -->|HTTP| Resource
-    Client -->|HTTP| Usage
-    Resource -->|reserve/release| Quota
-    Resource -->|provision/cancel/terminate| Provider
-    Resource -->|start/stop| Billing
-    Resource -->|record lifecycle event| Notification
-    Usage -->|HTTP| Quota
-    Usage -->|HTTP| Resource
-    Usage -->|HTTP| Billing
-    Expiry -->|expired list/termination| Resource
-    Quota --> quota_db[(quota_db)]
-    Resource --> resource_db[(resource_db)]
-    Provider --> provider_db[(provider_db)]
-    Billing --> billing_db[(billing_db)]
-    Notification --> notification_db[(notification_db)]
-```
-
-### Provisioning
-
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant R as Resource
-    participant Q as Quota
-    participant P as Provider
-    participant B as Billing
-    participant N as Notification
-    C->>R: POST resources, Idempotency-Key
-    R->>R: Claim key; persist quota recovery intent
-    R->>Q: Reserve quota
-    Q-->>R: Reservation
-    R->>R: Commit resource, reservation and pending work
-    R-->>C: 202, reservation URL
-    R->>P: Provision with stable clientToken
-    P-->>R: Instance ID
-    R->>B: Start meter by resourceId
-    B-->>R: Meter
-    R->>R: Commit ACTIVE and COMPLETED together
-    R->>N: ACTIVE notification
-    C->>R: Poll reservation
-    R-->>C: COMPLETED
-```
-
-### Billing failure and compensation
-
-```mermaid
-sequenceDiagram
-    participant R as Resource
-    participant B as Billing
-    participant P as Provider
-    participant Q as Quota
-    participant N as Notification
-    R->>B: Start meter, always-fail
-    B-->>R: 503; retries exhausted
-    R->>R: Persist COMPENSATE work
-    R->>B: Stop any possibly committed meter
-    R->>P: Cancel provisioning by clientToken
-    Note over R,P: Both independent cleanup steps are attempted
-    alt Cleanup confirmed
-        R->>Q: Release allocation
-        R->>R: Commit FAILED and remove work
-        R->>N: FAILED notification
-    else Peer unavailable
-        R->>R: Retain work and instance identity
-        Note over R: Retry after recovery or restart
+    Client["Client / verification script"]
+    subgraph Network["Docker Compose: shared crm bridge network"]
+        R["Resource :8082"]
+        Q["Quota :8081"]
+        P["Provider :8085"]
+        B["Billing :8083"]
+        N["Notification :8084"]
+        U["Usage Aggregator :8086"]
+        E["Expiry Worker :8087"]
+        PG["PostgreSQL :5432<br/>Five databases and service roles"]
+        R -->|reserve / release| Q
+        R -->|provision / terminate| P
+        R -->|start / stop meter| B
+        R -->|lifecycle event| N
+        U --> Q
+        U --> R
+        U --> B
+        E -->|termination request| R
+        Q --> PG
+        R --> PG
+        P --> PG
+        B --> PG
+        N --> PG
     end
+    Client -->|published HTTP ports| R
+    Client --> U
+    PG --> Volume[("Named pgdata volume")]
 ```
 
-Termination atomically changes ACTIVE to TERMINATED and records teardown in the same local
-transaction. HTTP 202 acknowledges the desired state; cleanup may still be pending. Durable
-work remains until Provider termination, Billing stop and Quota release succeed. Notification
-is best effort. Expiry uses this same termination API.
+Container-to-container traffic uses service DNS names, such as
+`http://provider:8085`, rather than `localhost`. Host HTTP ports are 8081-8087;
+PostgreSQL is published on host port 5433.
 
-## 4. Data design
+## 2. Docker Containerization and Docker Compose Deployment
 
-Each service has its own database, role and Flyway migration history. Foreign IDs are ordinary
-values; there are no cross-database joins or foreign keys in service code.
+### Containerization
 
-### Quota
+Each service has its own multi-stage Dockerfile. The build stage uses
+`maven:3.9-eclipse-temurin-21` to compile the source and package an executable JAR.
+The runtime stage uses `eclipse-temurin:21-jre`, receives only the application JAR
+from the build stage, and starts it with `java -jar`. This excludes Maven and
+source files from the runtime stage and avoids requiring a prebuilt host JAR.
+The wildcard JAR copy supports differing service artifact names.
 
-```mermaid
-erDiagram
-    tenants ||--|| tenant_quota : owns
-    tenants ||--o{ quota_reservations : holds
-    tenants {
-        varchar tenant_id PK
-        varchar tier
-    }
-    tenant_quota {
-        varchar tenant_id PK
-        integer cpu_used
-        integer cpu_limit
-        integer ram_used_gb
-        integer ram_limit_gb
-        integer instance_used
-        integer instance_limit
-    }
-    quota_reservations {
-        uuid reservation_id PK
-        varchar resource_id UK
-        varchar tenant_id FK
-        varchar state
-    }
-    quota_cancellations {
-        varchar resource_id PK
-        timestamptz cancelled_at
-    }
+Maven's dependency cache reduces repeated downloads. Runtime images include
+curl for HTTP healthchecks. Image packaging uses `-DskipTests`; successful
+packaging is therefore not presented as proof that tests passed.
+
+Runtime settings are supplied through environment variables, including ports,
+database connection settings and peer URLs. The default JVM maximum heap is
+256 MB, configurable through `JAVA_TOOL_OPTIONS`; this is not a total container
+memory limit. The example environment file contains local placeholder values,
+and real local `.env` files are ignored by Git.
+
+### Compose configuration
+
+[docker-compose.yml](../../docker-compose.yml) provides shared networking,
+readiness checks, application configuration and a persistent `pgdata` volume.
+The first startup of an empty PostgreSQL volume runs
+[init-compose.sh](../../scripts/db/init-compose.sh), which reuses
+[setup-u1.sql](../../scripts/db/setup-u1.sql) and
+[setup-u2-u4.sql](../../scripts/db/setup-u2-u4.sql). It creates the five databases
+and users; each application subsequently applies its own Flyway migrations.
+
+Initialization receives the same `DB_PASSWORD` as the applications and uses
+quoted psql variables. SQL failures stop initialization. Changing the environment
+password later does not rotate passwords in an existing database.
+
+PostgreSQL's TCP healthcheck avoids accepting its temporary initialization
+server as ready. Application healthchecks call `/health`. The database-owning
+services wait for healthy PostgreSQL; Resource additionally waits for Quota,
+Provider, Billing and Notification. Usage and Expiry wait for their peers.
+YAML anchors share these settings without duplicating configuration.
+
+`restart: unless-stopped` handles unexpected process exits. Readiness dependency
+conditions gate startup, not continuous dependency recovery; an unhealthy status
+alone does not trigger an automatic restart. Provider random failures and
+automatic expiry are disabled in the default demonstration configuration.
+
+Build and deploy from the repository root:
+
+```powershell
+docker compose config --quiet
+docker compose up -d --build --wait --wait-timeout 600
+docker compose ps --all
 ```
 
-The conditional update enforces all dimensions together. Reservation identity is serialized so
-concurrent retries add usage once. Cancellation tombstones prevent delayed reserves from
-recreating allocations after recovery released them.
+### Deployment and main-workflow evidence
 
-### Resource
+The successful Windows Compose capture is in
+[evidence/compose/20261102-090524](../../evidence/compose/20261102-090524).
+Its [transcript](../../evidence/compose/20261102-090524/verification.log) records
+eight healthy containers, five successful database logins, and
+`Saga COMPLETED -> ACTIVE`. Its
+[workflow JSON](../../evidence/compose/20261102-090524/before-restart-workflow.json)
+records:
 
-```mermaid
-erDiagram
-    resources ||--o{ reservations : tracks
-    resources {
-        uuid resource_id PK
-        varchar tenant_id
-        varchar status
-        varchar provider_instance_id
-        timestamptz expires_at
-    }
-    reservations {
-        uuid reservation_id PK
-        uuid resource_id FK
-        varchar status
-        varchar simulate_failure
-    }
-    idempotency_records {
-        varchar idempotency_key PK
-        char request_fingerprint
-        uuid reservation_id
-        text response_body
-        timestamptz expires_at
-    }
-    resource_work {
-        uuid resource_id PK
-        varchar kind
-        text payload
-        timestamptz updated_at
-    }
-```
-
-The work record can precede a Resource row so a local commit failure cannot lose a remote quota
-allocation. Committed work survives executor rejection or process exit. Database advisory locks
-prevent competing workers from processing one resource simultaneously. Coordination connections
-are separate from the application pool so waiting HTTP work does not consume its pooled slots.
-
-### Billing
-
-```mermaid
-erDiagram
-    billing_meters {
-        uuid meter_id PK
-        text resource_id UK
-        text tenant_id
-        numeric rate_per_cpu_hour
-        timestamptz started_at
-        timestamptz stopped_at
-    }
-    billing_events {
-        bigint event_id PK
-        text resource_id
-        text event_type
-    }
-    billing_stops {
-        text resource_id PK
-        timestamptz stopped_at
-    }
-```
-
-Rates use NUMERIC(10,4). Cost uses BigDecimal and whole elapsed seconds. Monthly cost intersects
-the meter interval with the requested UTC calendar month. Serialized start/stop operations
-produce one START and one STOP event. A stop tombstone blocks a late start after cancellation.
-
-### Provider
-
-```mermaid
-erDiagram
-    instances {
-        text instance_id PK
-        text client_token UK
-        text status
-        timestamptz terminated_at
-    }
-    cancelled_requests {
-        varchar client_token PK
-        timestamptz cancelled_at
-    }
-```
-
-Provisioning preserves the client token across retries. Cancellation by token also covers a
-request whose instance ID was never received. A cancelled request cannot create a late instance.
-
-### Notification
-
-```mermaid
-erDiagram
-    notifications {
-        uuid notification_id PK
-        varchar tenant_id
-        varchar resource_id
-        varchar event_type
-        varchar status
-        integer attempts
-        timestamptz created_at
-        timestamptz sent_at
-    }
-```
-
-A transaction records the event and delivery result. Pending records are retried with row locks
-and a bounded attempt count. Delivery is simulated and at least once. Usage and Expiry have no
-databases or ER diagrams.
-
-## 5. API design
-
-| Service | APIs |
+| Check | Captured result |
 |---|---|
-| Quota | POST/GET tenants; GET tenant quota; POST quota reservations; POST reservation release |
-| Resource | POST/GET resources; GET reservation; POST termination; GET expired candidates |
-| Billing | POST/GET meters; POST meter stop; GET tenant monthly cost |
-| Notification | POST lifecycle event; GET tenant history |
-| Provider | POST instances; DELETE instance; DELETE provisioning request by token |
-| Usage | GET usage for tenant |
-| Expiry | Scheduled HTTP client; no business endpoint |
+| Provisioning | Resource `6b30f6e7-5500-47e1-8a02-9ac1fa9ba9d4` is ACTIVE |
+| Quota | 4 CPUs, 8 GB RAM and 1 instance allocated |
+| Provider | Resource has a provider instance; the verifier checked its ACTIVE database record |
+| Billing | Meter is ACTIVE for the same resource and tenant |
+| Notification | ACTIVE event recorded with SENT delivery status |
+| Usage | Resource returned; quota, resource and billing availability are all true |
 
-Business paths use `/api/v1`. Health is `/health`; generated OpenAPI is `/v3/api-docs.yaml`.
+The initial acceptance response remains `PENDING` in the saved JSON because it
+precedes background processing; the transcript records completion after polling.
+All seven images also built successfully during the recorded implementation
+session. Ten mocked Pester verification-script tests passed separately; those
+are not substitutes for the live workflow.
 
-Example provisioning request:
+**Compose evidence boundary:** these captures used `-SkipBuild -SkipRestart`.
+A separate clean-checkout repeat and Compose `down`/`up` persistence demonstration
+are not established by the available captures. The named volume is configured,
+but its Compose restart behavior must still be demonstrated without using
+`down -v`. Kubernetes persistence evidence below is a different deployment test.
 
-```http
-POST /api/v1/resources
-Idempotency-Key: example-operation
-Content-Type: application/json
+## 3. Situated-Learning Problem
 
-{"tenantId":"tnt-demo","type":"VM","cpu":2,"ramGb":4,"durationSeconds":60}
+### Observed symptom
+
+A genuine failure occurred during the Windows happy-path check: all eight
+containers were healthy, but the database-login verification exited with code 2.
+PostgreSQL reported:
+
+```text
+FATAL: role "sh" does not exist
 ```
 
-A successful admission returns 202 with `reservationId`, `resourceId` and `statusUrl`.
-Polling returns PENDING, COMPLETED or FAILED. Changed payloads on an existing key return 422.
-Invalid input returns 400, missing resources return 404, state conflicts return 409, and
-unavailable dependencies return 503. Errors use Problem Details with `code`, `correlationId`
-and `timestamp`; field validation identifies the affected input.
+The failing command was intended to authenticate as `quota_user` against
+`quota_db`. The failure is recorded in the
+[failed transcript](../../evidence/compose/20261102-090138/verification.log)
+and [container logs](../../evidence/compose/20261102-090138/failure-containers.log).
 
-OpenAPI files: [Quota](services/quota/openapi.yaml), [Resource](services/resource/openapi.yaml),
-[Billing](services/billing-service/openapi.yaml), [Provider](services/provider/openapi.yaml),
-[Notification](services/notification-service/openapi.yaml), [Usage](services/usage-aggregator/openapi.yaml),
-[Expiry](services/expiry-worker/openapi.yaml).
+### Diagnosis
 
-## 6. Engineering challenges
+`docker compose ps --all` confirmed application readiness, while PostgreSQL logs
+showed that it was accepting connections. Reproducing the verification command
+revealed that the wrong username reached psql. Windows PowerShell 5.1 altered
+nested quotes in the command passed through `docker compose exec ... sh -c`.
+This was an argument-handling problem in the verification harness, not missing
+service roles or a failed application startup.
 
-| Challenge | Problem and design | Alternative and trade-off | Evidence |
-|---|---|---|---|
-| 1: concurrency | Several requests compete for tenant capacity; a conditional SQL update is the admission decision | Read-then-write permits races; serializing all tenants would reduce concurrency unnecessarily | [Challenge 1](evidence/challenge-1-quota-concurrency/output.txt), Quota PostgreSQL tests |
-| 2: idempotency | Requests retry after uncertain responses; a unique key, normalized fingerprint and stored response preserve one operation | Client-side deduplication cannot protect the server; permanent key retention has unbounded storage cost | [Challenge 2](evidence/challenge-2-idempotency/output.txt), Resource concurrent HTTP tests |
-| 3C: saga compensation | Remote steps can commit independently; persistent work retries idempotent cleanup and cancellation | Distributed transactions would require participation from every service; log-only cleanup loses recovery after restart | [Challenge 3C](evidence/challenge-3c-saga-compensation/output.txt), RecoveryIT, seven-service restart test |
+### Solution
 
-Idempotency defaults to 24-hour retention with an hourly deletion sweep. Retries have bounded
-timeouts and backoff; persistent cleanup continues across separate retry passes when a peer
-remains unavailable. A circuit breaker is not required by the selected challenge.
+The corrected verifier sent the shell script through standard input to
+`sh -s --`, leaving database user/name arguments separate. SQL queries were
+likewise sent to psql through standard input. JSON-array handling was also
+corrected so notification evidence contained a single matching record rather
+than a PowerShell array wrapper.
 
-## 7. Testing
+### Validation
 
-Tests cover domain policy, HTTP errors, PostgreSQL constraints, simultaneous reservations and
-meter operations, request replay, compensation, notification retry, usage degradation and
-scheduled expiry. Dedicated test databases keep test data separate from application data.
-Quota and Resource accept external PostgreSQL test URLs as an alternative to Testcontainers.
-Provider tests start isolated PostgreSQL. Notification's `postgres` profile uses its test database.
+After correction, all ten mocked regression tests passed, including checks for
+standard-input command handling and matching notification identity. The live
+verifier then passed all five database logins and the full provisioning workflow.
+The successful transcript and workflow JSON linked in Section 2 provide the
+post-fix evidence.
 
-The process test runs seven separate jars against five PostgreSQL databases without HTTP stubs.
-It checks manual and scheduled termination, real Billing failure, quota refund, notification
-history, peer outages and Resource restart during unfinished teardown.
+**Reproduction caution:** the currently inspected repository copy of
+[verify-compose.ps1](../../scripts/demo/verify-compose.ps1) again contains the
+original `sh -c` command. The historical passing capture used the corrected
+implementation. Restore or merge that correction before repeating the Windows
+demo; the saved result does not prove the current script has the fix.
 
-Current commands, counts and captured output are in [integration evidence](evidence/integration/README.md).
-Challenge scripts and their dated captures are linked from the evidence index.
+### Learning and team troubleshooting contribution
 
-## 8. Design decisions and trade-offs
+Healthy containers do not guarantee that host-side verification tools are
+correct. Diagnosis must follow the failure across PowerShell, Docker, the
+container shell and PostgreSQL. Native quoting boundaries require real-platform
+tests; mocks alone did not expose this issue.
 
-| Decision | Rationale | Cost or limit |
-|---|---|---|
-| Synchronous quota, asynchronous provisioning | Reject insufficient capacity before accepting work; avoid waiting for the slow Provider | Clients poll a reservation URL |
-| Orchestration rather than choreography | One service owns lifecycle and cleanup order | Resource coordinates the transaction and must persist recovery intent |
-| Database per service | Independent ownership and role-enforced separation | Cross-service consistency is eventual |
-| SQL guards and idempotent operations | Enforce concurrent capacity and retry safety at the data owner | PostgreSQL-specific queries require real database tests |
-| Durable work in Resource | Recover accepted and cleanup work without a workflow platform | Polling and retained pending rows while peers are unavailable |
-| At-least-once notifications | Keep delivery failure outside provisioning correctness | Repeated POST can record another notification; there is no event deduplication key |
+Karan's [Task 3 contribution](Karan_task_3_report.md) separately reports Billing
+starting before PostgreSQL readiness and being stabilized with a database
+healthcheck and `service_healthy`. This reinforces that startup order is not
+readiness. The available Compose evidence confirms healthy Billing and a working
+meter after deployment, but does not independently capture that earlier Billing
+startup failure. Karan should supply the corresponding before-fix evidence for
+his individual troubleshooting demonstration. In this repository, the Compose
+service name is `billing` and its health endpoint is `/health`.
 
-## 9. Limitations and future work
+## 4. Advanced Task and Evidence
 
-This is a local assignment implementation. There is no authentication, real provider integration,
-cloud deployment, invoicing or automated operations platform. Usage combines independent reads
-rather than a consistent cross-service snapshot. Notification delivery can be repeated.
-Cancellation records retain operation identities and must not be removed while delayed requests
-can still arrive. Cleanup remains pending during an unavailable peer; operators can inspect the
-Resource work table and correlated logs.
+The advanced task was attempted: Kubernetes deployment on Minikube, plus Provider
+self-healing and scaling. The [Kubernetes configuration](../../k8s) includes
+application Deployments and Services, a runtime ConfigMap, a locally generated
+database Secret, startup/readiness/liveness probes, and a PostgreSQL StatefulSet
+with a 5 GiB persistent volume claim. Kustomize reuses the database init scripts.
+Resource is accessible through a host port-forward.
 
-Deployment, authentication and operational retention policies belong to a later production scope.
+The repository's [advanced evidence summary](../../evidence/k8s/README.md) and
+[results.json](../../evidence/k8s/results.json) record:
 
-## 10. Submission materials
+| Demonstration | Recorded evidence |
+|---|---|
+| Main workflow through Kubernetes | ACTIVE resource with matching quota, Provider, ACTIVE Billing meter, SENT notification and available Usage |
+| Provider self-healing | Deleted and replacement pod UIDs differ; fresh provisioning succeeds |
+| Provider scaling | Two distinct Ready Service endpoints; provisioning through the scaled Service succeeds |
+| PostgreSQL persistence | Replacement pod UID; same PVC/volume and original resource, provider, meter and notification identities |
+| Host entry point | Provisioning through port-forward; health and Swagger return HTTP 200 |
+| Additional verification | Idempotency, termination, compensation, durable teardown, partial outage and scheduled expiry results |
 
-The Google Drive link for the demo video and submission documents has not been supplied.
-The assignment requires an 8–10 minute team video showing the main flow, a failure case and
-challenge demonstrations. Recording and uploading the video remain team deliverables.
+The evidence summary also records 142 Java tests with zero failures or skips and
+a passing full-stack integration scenario. These counts are reported from the
+repository capture, not from a new test run performed for this report.
 
-## Assignment 2: Vinayak's Compose contribution
+**Limits:** scaling establishes two Ready endpoints and a successful workflow,
+not increased throughput or proof that both replicas received requests.
+Database persistence was checked across pod replacement on one local node, not
+node-loss recovery or backup restoration. The Kubernetes video and personal
+explanations remain separate individual deliverables.
 
-Implemented Task 2's deployment configuration in [docker-compose.yml](docker-compose.yml):
-seven separately built Java images and one PostgreSQL 16 container share a bridge network.
-The named `pgdata` volume preserves all five service databases. The init wrapper reuses
-the Assignment 1 SQL scripts and supplies the same environment-driven password used by
-the applications; standalone SQL execution retains its local placeholder default.
+## 5. Individual Contributions and AI-Use Declaration
 
-```mermaid
-flowchart LR
-    Host --> Resource
-    subgraph crm["Compose crm network: seven app containers + PostgreSQL"]
-        Resource --> Quota
-        Resource --> Provider
-        Resource --> Billing
-        Resource --> Notification
-        Usage --> Quota
-        Usage --> Resource
-        Usage --> Billing
-        Expiry --> Resource
-        Quota & Resource & Provider & Billing & Notification --> Postgres
-    end
-    Postgres --> pgdata[("pgdata: five isolated databases")]
-```
+Responsibilities follow [the assignment work allocation](units.md). Shared
+templates and integration work cross service boundaries; task ownership should
+not be interpreted as proof that one person authored every related line.
 
-Every Java runtime includes curl for its HTTP healthcheck. TCP readiness prevents
-PostgreSQL's temporary initialization server from releasing dependent services early.
-Resource waits for its four peers to become healthy; Usage and Expiry wait for their
-peers. Peer URLs use service DNS names. All JVMs have a configurable 256 MB heap default.
-Vinayak's Provider Dockerfile remains a Maven/JDK build followed by a Java 21 JRE runtime.
+| Member | Assigned responsibility and reportable contribution |
+|---|---|
+| Prajwal | Task 1 containerization lead; Quota and Resource ownership. Multi-stage image template, service configuration contract and placeholder environment configuration underpin the deployment. |
+| Vinayak | Task 2 Compose lead; Provider ownership. Shared network and peer wiring, database initialization/password alignment, health-gated startup, named storage, runtime curl integration, workflow/restart verifier, regression checks and deployment/demo documentation. Live Compose happy-path results are captured. |
+| Karan | Task 3 troubleshooting lead; Billing ownership. Individual report describes the database-readiness diagnosis, healthcheck/dependency solution and readiness reflection; original failure evidence still needs to accompany that claim. |
+| Siddharth | Part B lead; Notification, Usage and Expiry ownership. Kubernetes deployment and advanced workflow verification, Provider recovery/scaling, persistent database configuration and captured advanced results. |
 
-[verify-compose.ps1](scripts/demo/verify-compose.ps1) captures container status and logs,
-asserts provision -> COMPLETED -> ACTIVE through the real peers, checks notification and
-usage data, then recreates containers without deleting the volume. It checks persisted
-identities in all five databases and runs a fresh saga after restart.
+Each member should review their contribution claims, explain their own
+configuration and present their own segment of the team demonstration. A passing
+shared workflow does not replace individual reflection or demonstration evidence.
 
-**Reflection:** container startup is not application readiness; dependency healthchecks
-must wait for initialization, not just a process or socket. Environment-only credential
-overrides also fail unless first-boot database initialization receives the same values.
-Named volumes outlive containers, so credential rotation is distinct from recreating
-containers. In a real deployment, readiness gates complement application retries,
-explicit password rotation and backup/restore procedures.
-
-**Evidence status:** all 10 mocked Pester regression tests passed. Configuration checks
-verified eight services, an acyclic readiness graph, peer DNS/ports, matching database
-credentials and persistent storage. Shell checks verified password quoting, init ordering,
-error propagation and safe sourcing by the PostgreSQL entrypoint. Docker is unavailable
-in this development environment. Live clean-checkout builds,
-all-eight-container health, inter-service workflow and volume-persistence evidence remain
-pending execution of the verification script on a Docker-enabled machine. Do not claim
-these demonstrations passed until the generated evidence has been reviewed. Vinayak must
-confirm the contribution/reflection and present his Compose/Provider demo segment.
-
-## Assignment 2: Kubernetes deployment — Siddharth
-
-Seven application Deployments and a PostgreSQL StatefulSet run in namespace `crm`.
-Services provide internal DNS names; a ConfigMap supplies runtime settings and a Secret
-supplies credentials. The existing initialization scripts create five isolated databases
-on a persistent volume. Readiness includes database health; liveness uses the application
-liveness group. [Deployment instructions](k8s/README.md) and [test evidence](evidence/k8s/README.md)
-include the commands and observed results.
-
-Verification covers provisioning and peer effects, Provider pod replacement, scaling to
-two Ready Service endpoints and PostgreSQL pod replacement with retained workflow identities.
-The full application test suite and lifecycle integration scenario are recorded separately
-from the Kubernetes checks. The selected advanced capability is self-healing/scaling.
-
-**Reflection:** pod readiness does not establish Service reachability; both need to be
-checked before submitting the workflow. A persistent volume preserves data across pod replacement; it does not provide a backup. Two Ready replicas establish
-scaling behavior, while throughput and traffic distribution require separate measurements.
-
-## Appendix: contributions and AI use
-
-Service ownership is recorded in [units.md](aidlc-docs/inception/units.md). Prajwal owns Quota and
-Resource; Karan owns Billing; Vinayak owns Provider; Siddharth owns Notification, Usage and Expiry.
-The local integration work adds boundary fixes, failure recovery and regression verification
-across those services. Individual reflections and final contribution claims must be confirmed
-by the corresponding team members.
-
-AI tools assisted with implementation, review, documentation and testing. The team remains
-responsible for understanding the code and explaining it in the demonstration.
-
-AI assistance was used for the Compose configuration, initialization, verification and documentation.
-AI assistance covered the Kubernetes configuration, testing and documentation.
+**AI-use declaration:** An AI assistant using Copilot SDK in VS Code assisted
+with Compose hardening, initialization wiring, verification-script implementation,
+regression tests, troubleshooting, demo notes and this evidence-based report.
+The existing Assignment 1 report separately declares OpenAI Codex assistance.
+Other members should confirm any additional AI tools they used. AI-generated
+changes and text require human review; the team remains responsible for their
+correctness, evidence, understanding and final submission.
